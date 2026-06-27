@@ -1,0 +1,288 @@
+/* ------------------------- */
+/* RESET                     */
+/* ------------------------- */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #050505;
+  color: #f4f4f4;
+}
+
+img {
+  display: block;
+  width: 100%;
+}
+
+/* ------------------------- */
+/* GLOBAL                    */
+/* ------------------------- */
+
+.page {
+  width: 100%;
+  overflow-x: clip;
+}
+
+.eyebrow {
+  font-size: clamp(0.7rem, 1vw, 0.9rem);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* ------------------------- */
+/* HERO / OUTRO              */
+/* ------------------------- */
+
+.hero,
+.outro {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 5vw;
+  text-align: center;
+  background: #050505;
+}
+
+.hero-content,
+.outro > div {
+  width: min(1100px, 100%);
+}
+
+.hero h1,
+.outro h2 {
+  margin-top: 1rem;
+  font-size: clamp(4rem, 14vw, 14rem);
+  line-height: 0.82;
+  letter-spacing: -0.1em;
+  font-weight: 900;
+}
+
+.hero p:not(.eyebrow) {
+  width: min(720px, 90vw);
+  margin: 2rem auto 0;
+  font-size: clamp(1rem, 1.45vw, 1.25rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+/* ------------------------- */
+/* STORY SECTION             */
+/* ------------------------- */
+
+/*
+  La historia completa.
+  Es relative para contener la escena sticky y los steps.
+*/
+
+.story {
+  position: relative;
+  background: #050505;
+}
+
+/*
+  La escena visual se queda fija en pantalla.
+  Todo el relato pasa por encima.
+*/
+
+.story-visual {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 0;
+  background: #111;
+}
+
+/* Capas visuales */
+
+.visual-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.08);
+  transition:
+    opacity 700ms ease,
+    transform 1200ms ease;
+}
+
+.visual-layer.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.visual-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.6) contrast(1.1) saturate(0.85);
+}
+
+/*
+  Overlay oscuro para legibilidad.
+*/
+
+.visual-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(0,0,0,0.08), rgba(0,0,0,0.75)),
+    linear-gradient(to bottom, rgba(0,0,0,0.75), transparent 40%, rgba(0,0,0,0.85));
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ------------------------- */
+/* PROGRESS INDICATOR        */
+/* ------------------------- */
+
+.progress-indicator {
+  position: absolute;
+  left: clamp(1.25rem, 4vw, 4rem);
+  bottom: clamp(1.25rem, 4vw, 4rem);
+  z-index: 3;
+
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.progress-line {
+  position: relative;
+  width: min(30vw, 220px);
+  height: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 25%;
+  background: #fff;
+  transform-origin: left center;
+  transition: width 500ms ease;
+}
+
+/* ------------------------- */
+/* TEXT STEPS                */
+/* ------------------------- */
+
+/*
+  Importante:
+  Los steps están por encima de la escena sticky.
+*/
+
+.story-steps {
+  position: relative;
+  z-index: 3;
+  margin-top: -100vh;
+  padding: 100vh 5vw 45vh;
+}
+
+/*
+  Cada step mide 100vh para darle ritmo narrativo.
+*/
+
+.story-step {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  width: min(680px, 92vw);
+
+  opacity: 0.35;
+  transform: translateY(40px);
+  transition:
+    opacity 500ms ease,
+    transform 500ms ease;
+}
+
+.story-step:nth-child(even) {
+  margin-left: auto;
+  text-align: right;
+}
+
+.story-step.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.story-step h2 {
+  margin-top: 1rem;
+  font-size: clamp(3rem, 8vw, 8.5rem);
+  line-height: 0.86;
+  letter-spacing: -0.09em;
+  font-weight: 900;
+}
+
+.story-step p:not(.eyebrow) {
+  margin-top: 1.5rem;
+  font-size: clamp(1rem, 1.35vw, 1.2rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.story-step:nth-child(even) p:not(.eyebrow) {
+  margin-left: auto;
+}
+
+/* ------------------------- */
+/* RESPONSIVE                */
+/* ------------------------- */
+
+@media (max-width: 768px) {
+  .story-steps {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .story-step,
+  .story-step:nth-child(even) {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .progress-indicator {
+    left: 1.25rem;
+    right: 1.25rem;
+  }
+
+  .progress-line {
+    width: 100%;
+  }
+
+  .hero h1,
+  .outro h2 {
+    letter-spacing: -0.08em;
+  }
+}
+
+/* ------------------------- */
+/* REDUCED MOTION            */
+/* ------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .visual-layer,
+  .story-step,
+  .progress-fill {
+    transition: none;
+  }
+}
