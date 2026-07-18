@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Brayan Andrés Castillo Mesa — CV / Portfolio</title>
+
+  <meta
+    name="description"
+    content="CV web de Brayan Andrés Castillo Mesa, aprendiz SENA en Análisis y Desarrollo de Software, desarrollador full-stack junior enfocado en proyectos web, experiencias interactivas y soluciones digitales."
+  />
+
+  <meta property="og:title" content="Brayan Andrés Castillo Mesa — CV / Portfolio" />
+  <meta property="og:description" content="Software Developer CV focused on client work, selected projects, skills, experience and certificates." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cv.blackars.com" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Brayan Andrés Castillo Mesa",
+    "alternateName": "Blackars",
+    "url": "https://blackars.com",
+    "email": "mailto:blackars313@gmail.com",
+    "jobTitle": "Software Developer / SENA ADSO Apprentice",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Bogotá D.C.",
+      "addressCountry": "CO"
+    },
+    "knowsAbout": [
+      "HTML",
+      "CSS",
+      "JavaScript",
+      "React",
+      "Node.js",
+      "Python",
+      "MySQL",
+      "SQLite",
+      "Three.js",
+      "Astro",
+      "Git",
+      "UI Development",
+      "Creative Coding",
+      "Web Development"
+    ],
+    "sameAs": [
+      "https://blackars.com",
+      "https://www.linkedin.com/in/blackars",
+      "https://github.com/blackars"
+    ]
+  }
+  </script>
+
+  <style>
+    /* ==========================================================
+       CV.BLACKARS.COM — FIRST PROTOTYPE
+       ----------------------------------------------------------
+       Design goals:
+       - Cambridge-style CV structure
+       - Monochrome techno-minimal visual language
+       - Readable by humans, ATS-like parsers and AI models
+       - Screen: tabbed sections
+       - Print/PDF: continuous document
+       ========================================================== */
+
+    :root {
+      --bg: #f7f7f3;
+      --surface: #ffffff;
+      --text: #070707;
+      --muted: #565656;
+      --line: #070707;
+      --soft-line: rgba(0, 0, 0, 0.15);
+      --accent: #070707;
+      --accent-invert: #ffffff;
+      --shadow: rgba(0, 0, 0, 0.12);
+
+      --max-width: 1540px;
+      --content-width: 1120px;
+      --radius: 0px;
+
+      --font-display: Impact, Haettenschweiler, "Arial Black", system-ui, sans-serif;
+      --font-mono: "Courier New", Courier, monospace;
+      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html[data-theme="dark"] {
+      --bg: #050505;
+      --surface: #0d0d0d;
+      --text: #f5f5f0;
+      --muted: #a8a8a0;
+      --line: #f5f5f0;
+      --soft-line: rgba(255, 255, 255, 0.18);
+      --accent: #f5f5f0;
+      --accent-invert: #050505;
+      --shadow: rgba(255, 255, 255, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      line-height: 1.35;
+      transition: background 240ms ease, color 240ms ease;
+    }
+
+    ::selection {
+      background: var(--accent);
+      color: var(--accent-invert);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 4px;
+    }
+
+    a:hover {
+      text-decoration-thickness: 3px;
+    }
+
+    button {
+      font-family: inherit;
+    }
+
+    img,
+    video {
+      max-width: 100%;
+      display: block;
+    }
+
+    .page {
+      width: min(var(--max-width), calc(100% - 48px));
+      margin: 0 auto;
+      padding: 46px 0 80px;
+    }
+
+    /* ----------------------------------------------------------
+       Top utility bar
+       ---------------------------------------------------------- */
+
+    .utility-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 52px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .utility-left,
+    .utility-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .theme-toggle,
+    .print-button {
+      border: 1.5px solid var(--line);
+      background: transparent;
+      color: var(--text);
+      padding: 8px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      transition: background 180ms ease, color 180ms ease;
+    }
+
+    .theme-toggle:hover,
+    .print-button:hover {
+      background: var(--accent);
+      color: var(--accent-invert);
+    }
+
+    /* ----------------------------------------------------------
+       Hero
+       ---------------------------------------------------------- */
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 290px;
+      gap: 72px;
+      align-items: start;
+      margin-bottom: 72px;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      line-height: 0.9;
+      font-size: clamp(3rem, 7vw, 6.4rem);
+      margin: 0 0 32px;
+      font-weight: 900;
+    }
+
+    .role-line {
+      font-family: var(--font-mono);
+      font-size: clamp(1rem, 1.6vw, 1.35rem);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      margin: 0 0 18px;
+    }
+
+    .availability-line {
+      color: var(--muted);
+      font-size: 0.96rem;
+      margin-bottom: 30px;
+    }
+
+    .intro {
+      max-width: 980px;
+      font-size: clamp(1rem, 1.45vw, 1.35rem);
+      line-height: 1.26;
+      margin: 0 0 42px;
+    }
+
+    .hero-meta {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 40px;
+      align-items: end;
+      max-width: 1160px;
+    }
+
+    .link-stack {
+      display: grid;
+      gap: 12px;
+      font-size: clamp(1rem, 1.55vw, 1.45rem);
+    }
+
+    .download-link {
+      font-size: clamp(1rem, 1.55vw, 1.45rem);
+      white-space: nowrap;
+    }
+
+    .quick-facts {
+      margin-top: 38px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      max-width: 980px;
+    }
+
+    .fact {
+      border: 1.5px solid var(--line);
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    /* Geometric placeholder / avatar area */
+
+    .hero-visual {
+      min-height: 390px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      overflow: visible;
+    }
+
+    .orb {
+      width: 260px;
+      height: 390px;
+      background: var(--accent);
+      border-radius: 260px 0 0 260px;
+      position: relative;
+      overflow: hidden;
+      animation: breathe 5.5s ease-in-out infinite;
+    }
+
+    .orb::before {
+      content: "";
+      position: absolute;
+      inset: 30px 0 30px 58px;
+      border: 1.5px solid var(--accent-invert);
+      border-right: 0;
+      border-radius: 200px 0 0 200px;
+      opacity: 0.36;
+      transform-origin: center;
+      animation: orbitLine 8s linear infinite;
+    }
+
+    .orb::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--accent-invert);
+      top: 50%;
+      left: 34%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: pulseDot 2.4s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% {
+        transform: scaleY(1);
+      }
+      50% {
+        transform: scaleY(0.94);
+      }
+    }
+
+    @keyframes orbitLine {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(-14px);
+      }
+    }
+
+    @keyframes pulseDot {
+      0%, 100% {
+        opacity: 0.35;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.8);
+      }
+    }
+
+    /* ----------------------------------------------------------
+       Navigation line / tabs
+       ---------------------------------------------------------- */
+
+    .section-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(10px);
+      padding-top: 14px;
+      margin-bottom: 72px;
+    }
+
+    .tabs-inner {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: end;
+      border-bottom: 4px solid var(--line);
+      max-width: 100%;
+    }
+
+    .tab-button {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--font-display);
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+      font-size: clamp(1.4rem, 2.2vw, 2.35rem);
+      padding: 0 0 20px;
+      text-align: center;
+      opacity: 0.55;
+      position: relative;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .tab-button:first-child {
+      text-align: left;
+    }
+
+    .tab-button:last-child {
+      text-align: right;
+    }
+
+    .tab-button:hover,
+    .tab-button[aria-selected="true"] {
+      opacity: 1;
+    }
+
+    .tab-button[aria-selected="true"]::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -36px;
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      border-left: 30px solid transparent;
+      border-right: 30px solid transparent;
+      border-top: 30px solid var(--line);
+    }
+
+    /* ----------------------------------------------------------
+       Panels
+       ---------------------------------------------------------- */
+
+    .panel {
+      display: none;
+      animation: panelIn 220ms ease;
+    }
+
+    .panel.is-active {
+      display: block;
+    }
+
+    @keyframes panelIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .section-kicker {
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .section-heading {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      font-size: clamp(2rem, 4vw, 4.2rem);
+      letter-spacing: 0.04em;
+      line-height: 0.92;
+      margin: 0 0 34px;
+    }
+
+    .section-intro {
+      max-width: 780px;
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin: -18px 0 52px;
+    }
+
+    .group {
+      margin-bottom: 86px;
+    }
+
+    /* ----------------------------------------------------------
+       Project cards
+       ---------------------------------------------------------- */
+
+    .project-list {
+      display: grid;
+      gap: 72px;
+    }
+
+    .project-card {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
+      gap: 38px;
+      align-items: start;
+      padding-bottom: 58px;
+      border-bottom: 1.5px solid var(--soft-line);
+    }
+
+    .project-card:last-child {
+      border-bottom: 0;
+    }
+
+    .media-frame {
+      border: 1.5px solid var(--line);
+      background: var(--surface);
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 8px 8px 0 var(--shadow);
+    }
+
+    .media-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    .media-placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(90deg, var(--soft-line) 1px, transparent 1px),
+        linear-gradient(var(--soft-line) 1px, transparent 1px);
+      background-size: 22px 22px;
+      color: var(--text);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .media-placeholder strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .project-title {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      font-size: clamp(1.8rem, 3vw, 3.1rem);
+      letter-spacing: 0.04em;
+      line-height: 0.96;
+      margin: 0 0 16px;
+    }
+
+    .project-title.is-readable {
+      text-transform: none;
+      font-family: var(--font-sans);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .project-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .tag {
+      border: 1.25px solid var(--line);
+      padding: 4px 8px;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    .project-description {
+      font-size: 1rem;
+      max-width: 720px;
+      margin: 0 0 22px;
+    }
+
+    .project-bullets {
+      margin: 0 0 22px;
+      padding-left: 1.2rem;
+      max-width: 720px;
+      color: var(--muted);
+    }
+
+    .project-bullets li {
+      margin-bottom: 6px;
+    }
+
+    .project-links {
+      display: flex;
+      justify-content: flex-end;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 1.02rem;
+      margin-top: 28px;
+    }
+
+    /* ----------------------------------------------------------
+       Experience
+       ---------------------------------------------------------- */
+
+    .timeline {
+      display: grid;
+      gap: 0;
+      border-top: 2px solid var(--line);
+    }
+
+    .experience-item {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 44px;
+      padding: 34px 0;
+      border-bottom: 1.5px solid var(--soft-line);
+    }
+
+    .experience-date {
+      color: var(--muted);
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .experience-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.45rem, 2.4vw, 2.25rem);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0 0 6px;
+    }
+
+    .experience-org {
+      margin: 0 0 18px;
+      color: var(--muted);
+    }
+
+    .experience-body {
+      max-width: 820px;
+      margin: 0 0 18px;
+    }
+
+    /* ----------------------------------------------------------
+       Certificates / skills
+       ---------------------------------------------------------- */
+
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 66px;
+    }
+
+    .skill-block {
+      border: 1.5px solid var(--line);
+      padding: 18px;
+      min-height: 160px;
+      background: var(--surface);
+    }
+
+    .skill-block h3 {
+      margin: 0 0 14px;
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 1.25rem;
+    }
+
+    .skill-block p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .cert-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .certificate-card {
+      border: 1.5px solid var(--line);
+      padding: 22px;
+      background: var(--surface);
+    }
+
+    .certificate-card h3 {
+      margin: 0 0 8px;
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 1.3rem;
+    }
+
+    .certificate-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .certificate-meta {
+      margin-top: 16px;
+      font-size: 0.85rem;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ----------------------------------------------------------
+       Footer
+       ---------------------------------------------------------- */
+
+    .footer {
+      margin-top: 110px;
+      padding-top: 30px;
+      border-top: 4px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* ----------------------------------------------------------
+       Responsive
+       ---------------------------------------------------------- */
+
+    @media (max-width: 1100px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .hero-visual {
+        display: none;
+      }
+
+      .hero-meta {
+        grid-template-columns: 1fr;
+        gap: 28px;
+      }
+
+      .download-link {
+        justify-self: start;
+      }
+
+      .project-card {
+        grid-template-columns: 1fr;
+      }
+
+      .project-links {
+        justify-content: flex-start;
+      }
+
+      .skills-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        width: min(100% - 28px, var(--max-width));
+        padding-top: 28px;
+      }
+
+      .utility-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        margin-bottom: 40px;
+      }
+
+      .hero-title {
+        font-size: clamp(2.6rem, 15vw, 4.4rem);
+      }
+
+      .intro {
+        font-size: 1rem;
+      }
+
+      .tabs-inner {
+        grid-template-columns: 1fr;
+        border-bottom-width: 2px;
+      }
+
+      .tab-button,
+      .tab-button:first-child,
+      .tab-button:last-child {
+        text-align: left;
+        padding: 14px 0;
+      }
+
+      .tab-button[aria-selected="true"]::after {
+        display: none;
+      }
+
+      .section-tabs {
+        position: static;
+        margin-bottom: 46px;
+      }
+
+      .experience-item {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .skills-grid,
+      .cert-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ----------------------------------------------------------
+       Print / PDF mode
+       ----------------------------------------------------------
+       In print, all tab panels become continuous. This supports
+       your idea: web = selectable tabs, PDF = full CV below line.
+       ---------------------------------------------------------- */
+
+    @media print {
+      html,
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      :root {
+        --bg: #ffffff !important;
+        --surface: #ffffff !important;
+        --text: #000000 !important;
+        --muted: #333333 !important;
+        --line: #000000 !important;
+        --soft-line: rgba(0, 0, 0, 0.22) !important;
+        --accent: #000000 !important;
+        --accent-invert: #ffffff !important;
+      }
+
+      .page {
+        width: 100%;
+        padding: 0;
+      }
+
+      .utility-bar,
+      .theme-toggle,
+      .print-button,
+      .section-tabs,
+      .hero-visual,
+      .project-links a[href="#"],
+      .media-placeholder::after {
+        display: none !important;
+      }
+
+      .hero {
+        display: block;
+        margin-bottom: 32px;
+      }
+
+      .hero-title {
+        font-size: 42pt;
+        line-height: 0.95;
+        margin-bottom: 18pt;
+      }
+
+      .intro {
+        max-width: 100%;
+        font-size: 11pt;
+      }
+
+      .hero-meta {
+        display: block;
+      }
+
+      .link-stack,
+      .download-link {
+        font-size: 10pt;
+      }
+
+      .quick-facts {
+        gap: 5pt;
+      }
+
+      .fact,
+      .tag {
+        border: 1pt solid #000;
+        font-size: 7.5pt;
+      }
+
+      .panel,
+      .panel.is-active {
+        display: block !important;
+        animation: none !important;
+        page-break-inside: auto;
+      }
+
+      .panel::before {
+        content: "";
+        display: block;
+        border-top: 2pt solid #000;
+        margin: 24pt 0 18pt;
+      }
+
+      .section-heading {
+        font-size: 24pt;
+        margin-bottom: 16pt;
+      }
+
+      .group {
+        margin-bottom: 30pt;
+      }
+
+      .project-list {
+        gap: 26pt;
+      }
+
+      .project-card {
+        grid-template-columns: 34% 1fr;
+        gap: 18pt;
+        padding-bottom: 20pt;
+        break-inside: avoid;
+      }
+
+      .media-frame {
+        box-shadow: none;
+        border: 1pt solid #000;
+      }
+
+      video {
+        display: none !important;
+      }
+
+      .media-placeholder {
+        position: absolute;
+        background: #eeeeee !important;
+        color: #000000 !important;
+      }
+
+      .project-title {
+        font-size: 18pt;
+      }
+
+      .project-description,
+      .project-bullets,
+      .experience-body,
+      .section-intro {
+        font-size: 9.5pt;
+      }
+
+      .experience-item {
+        grid-template-columns: 24% 1fr;
+        gap: 14pt;
+        padding: 16pt 0;
+        break-inside: avoid;
+      }
+
+      .skills-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .cert-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .footer {
+        margin-top: 30pt;
+        font-size: 8pt;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+
+    <!-- Utility -->
+    <div class="utility-bar" aria-label="Utility navigation">
+      <div class="utility-left">
+      </div>
+
+      <div class="utility-right">
+        <button class="print-button" type="button" onclick="window.print()">
+          Print / Save PDF
+        </button>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
+          Dark mode
+        </button>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="hero">
+      <div class="hero-copy">
+        <h1 class="hero-title">Brayan Andrés Castillo Mesa</h1>
+
+        <p class="role-line">
+          Software Developer · Full-stack Junior · Creative Technologist
+        </p>
+
+        <p class="availability-line">
+          Bogotá D.C. / Remote Colombia · Available for SENA apprenticeship, internship or junior software roles
+        </p>
+
+        <p class="intro">
+          I build web applications, interactive digital experiences and internal tools with a focus on clarity,
+          functionality and visual precision. My work connects software development, minimal interfaces,
+          creative coding and practical problem solving.
+        </p>
+
+        <div class="hero-meta">
+          <nav class="link-stack" aria-label="Profile links">
+            <a href="https://www.blackars.com" target="_blank" rel="noreferrer">https://www.blackars.com</a>
+            <a href="https://www.linkedin.com/in/blackars" target="_blank" rel="noreferrer">https://www.linkedin.com/in/blackars</a>
+            <a href="https://github.com/blackars" target="_blank" rel="noreferrer">https://github.com/blackars</a>
+            <a href="mailto:blackars313@gmail.com">blackars313@gmail.com</a>
+          </nav>
+
+          <a class="download-link" href="/Brayan-Andres-Castillo-Mesa-CV.pdf" download>
+            Download a PDF Here
+          </a>
+        </div>
+
+        <div class="quick-facts" aria-label="Professional summary">
+          <span class="fact">SENA ADSO</span>
+          <span class="fact">Frontend</span>
+          <span class="fact">Backend basics</span>
+          <span class="fact">JavaScript</span>
+          <span class="fact">React</span>
+          <span class="fact">Node.js</span>
+          <span class="fact">Python</span>
+          <span class="fact">MySQL</span>
+          <span class="fact">Three.js</span>
+          <span class="fact">Git / GitHub</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+         <div class="orb"></div> 
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="section-tabs" aria-label="CV sections">
+      <div class="tabs-inner" role="tablist">
+        <button
+          class="tab-button"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="panel-projects"
+          id="tab-projects"
+          data-tab="projects">
+          Projects
+        </button>
+
+        <button
+          class="tab-button"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-experience"
+          id="tab-experience"
+          data-tab="experience">
+          Experience
+        </button>
+
+        <button
+          class="tab-button"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-certificates"
+          id="tab-certificates"
+          data-tab="certificates">
+          Certificates
+        </button>
+      </div>
+    </nav>
+
+    <main>
+      <!-- ======================================================
+           PROJECTS
+           ====================================================== -->
+      <section
+        class="panel is-active"
+        id="panel-projects"
+        role="tabpanel"
+        aria-labelledby="tab-projects"
+        data-panel="projects">
+
+        <!-- Client Work -->
+        <div class="group" id="client-work">
+          <div class="section-kicker">Commercial / delivered work</div>
+          <h2 class="section-heading">Client Work (4)</h2>
+          <p class="section-intro">
+            Projects created for clients or external use cases. These entries should communicate business context,
+            your role, the stack used and the concrete value delivered.
+          </p>
+
+          <div class="project-list">
+            <!-- Client Project 01 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <!-- Replace data-src with your actual .webm path -->
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/client-01.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Client project 01 loop preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Client Portal 01</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Client Work</span>
+                  <span class="tag">Frontend</span>
+                  <span class="tag">JavaScript</span>
+                  <span class="tag">Responsive UI</span>
+                </div>
+
+                <p class="project-description">
+                  Placeholder description for a client-facing website or application. Explain the client's need,
+                  the solution you built and why the interface improves communication, conversion or internal workflow.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> UI development, structure, responsive layout and deployment support.</li>
+                  <li><strong>Problem:</strong> The client needed a clear, fast and maintainable digital presence.</li>
+                  <li><strong>Result:</strong> Delivered a web experience prepared for public presentation and future updates.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live Site</a>
+                  <a href="#" target="_blank" rel="noreferrer">Case Notes</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Client Project 02 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/client-02.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Client project 02 loop preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Business Landing System</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Client Work</span>
+                  <span class="tag">HTML</span>
+                  <span class="tag">CSS</span>
+                  <span class="tag">SEO Basics</span>
+                </div>
+
+                <p class="project-description">
+                  Placeholder for a landing page or campaign site. Mention content hierarchy, call-to-action strategy,
+                  accessibility improvements and how the design adapts to mobile screens.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Layout, visual system, semantic HTML and performance improvements.</li>
+                  <li><strong>Problem:</strong> Information was fragmented and difficult to scan.</li>
+                  <li><strong>Result:</strong> Created a direct page structure focused on clarity and conversion.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live Site</a>
+                  <a href="#" target="_blank" rel="noreferrer">Case Notes</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Client Project 03 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/client-03.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Client project 03 loop preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Internal Dashboard</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Client Work</span>
+                  <span class="tag">Dashboard</span>
+                  <span class="tag">Data</span>
+                  <span class="tag">Power BI / JS</span>
+                </div>
+
+                <p class="project-description">
+                  Placeholder for an internal dashboard or reporting tool. Explain what data was organized,
+                  which indicators were displayed and how the interface helped decision-making.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Data organization, visual structure and report interaction design.</li>
+                  <li><strong>Problem:</strong> Operational information needed to be centralized and easier to read.</li>
+                  <li><strong>Result:</strong> Delivered a dashboard-like structure for faster monitoring.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live / Demo</a>
+                  <a href="#" target="_blank" rel="noreferrer">Case Notes</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Client Project 04 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/client-04.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Client project 04 loop preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Brand Website Module</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Client Work</span>
+                  <span class="tag">Website</span>
+                  <span class="tag">UI</span>
+                  <span class="tag">CMS-ready</span>
+                </div>
+
+                <p class="project-description">
+                  Placeholder for a modular website built for a brand, studio or independent business.
+                  Explain reusable sections, information architecture and visual consistency.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Visual implementation, component structure and content organization.</li>
+                  <li><strong>Problem:</strong> The client needed a flexible website that could grow over time.</li>
+                  <li><strong>Result:</strong> Built a reusable section-based layout for future expansion.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live Site</a>
+                  <a href="#" target="_blank" rel="noreferrer">Case Notes</a>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- Selected Works -->
+        <div class="group" id="selected-works">
+          <div class="section-kicker">Personal research / technical exploration</div>
+          <h2 class="section-heading">Selected Works (6)</h2>
+          <p class="section-intro">
+            Personal projects used to explore software architecture, creative coding, databases, visual systems,
+            interactive storytelling and AI-assisted workflows.
+          </p>
+
+          <div class="project-list">
+            <!-- Selected 01 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/minibase.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    MiniBase functionality loop
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">MiniBase v1.0</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Personal Project</span>
+                  <span class="tag">Python</span>
+                  <span class="tag">SQLite</span>
+                  <span class="tag">Data Management</span>
+                </div>
+
+                <p class="project-description">
+                  A miniature collection management tool designed to organize visual assets, metadata and lore.
+                  The project explores how structured databases can support creative collections and future AI/RPG integrations.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Full implementation, database structure and interface design.</li>
+                  <li><strong>Focus:</strong> CRUD logic, asset organization, local data persistence and modular expansion.</li>
+                  <li><strong>Next step:</strong> AI-assisted lore generation and import/export workflows.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Demo</a>
+                  <a href="#" target="_blank" rel="noreferrer">Repository</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Selected 02 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/momo-time-huntress.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Momo: Time-Huntress preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title is-readable">Momo: Time-Huntress</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Personal Project</span>
+                  <span class="tag">Ren'Py</span>
+                  <span class="tag">Narrative Design</span>
+                  <span class="tag">Interactive Fiction</span>
+                </div>
+
+                <p class="project-description">
+                  An interactive visual novel that combines science fiction, dark fantasy and branching narrative logic.
+                  It demonstrates interface scripting, visual composition and interactive storytelling.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Narrative structure, implementation, visual direction and interaction flow.</li>
+                  <li><strong>Focus:</strong> Scene logic, dialogue systems, audiovisual pacing and user progression.</li>
+                  <li><strong>Result:</strong> A playable narrative prototype with a defined visual identity.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Play / Preview</a>
+                  <a href="#" target="_blank" rel="noreferrer">Project Notes</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Selected 03 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/noxistence.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    NOXISTENCE website loop
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">NOXISTENCE Website</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Personal Project</span>
+                  <span class="tag">JavaScript</span>
+                  <span class="tag">Vite</span>
+                  <span class="tag">Docker</span>
+                  <span class="tag">Cloudinary</span>
+                </div>
+
+                <p class="project-description">
+                  A modular web platform created as a central infrastructure for a fictional universe.
+                  The project combines content management, media handling, interactive presentation and scalable deployment ideas.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Architecture, frontend implementation and content system planning.</li>
+                  <li><strong>Focus:</strong> Modular pages, multimedia assets, cloud media workflows and visual identity.</li>
+                  <li><strong>Technical angle:</strong> Prepared for future modules, authentication and deployment improvements.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live Site</a>
+                  <a href="#" target="_blank" rel="noreferrer">Repository</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Selected 04 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/portals-garden.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Portals Garden 3D loop
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Portals Garden</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Personal Project</span>
+                  <span class="tag">Three.js</span>
+                  <span class="tag">TensorFlow.js</span>
+                  <span class="tag">3D Web</span>
+                </div>
+
+                <p class="project-description">
+                  A 3D web experience designed as an interactive gateway into the NOXISTENCE universe.
+                  It explores spatial navigation, visual interaction and browser-based immersive experiences.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Creative coding, 3D interaction design and technical implementation.</li>
+                  <li><strong>Focus:</strong> WebGL scenes, navigation, interactive portals and experimental modules.</li>
+                  <li><strong>Result:</strong> A visual prototype connecting storytelling, interaction and real-time graphics.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Live Experience</a>
+                  <a href="#" target="_blank" rel="noreferrer">Repository</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Selected 05 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/artificial-mind.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Artificial Mind installation preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Artificial Mind</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Research</span>
+                  <span class="tag">AI + Art</span>
+                  <span class="tag">Installation</span>
+                  <span class="tag">New Media</span>
+                </div>
+
+                <p class="project-description">
+                  A research-based installation exploring the relationship between artificial intelligence,
+                  digital aesthetics and artistic creation. It connects technical experimentation with visual arts research.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Concept development, visual system and digital experimentation.</li>
+                  <li><strong>Focus:</strong> AI as creative medium, installation logic and audiovisual composition.</li>
+                  <li><strong>Context:</strong> Developed within an academic/research-oriented artistic process.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Project Page</a>
+                  <a href="#" target="_blank" rel="noreferrer">Documentation</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- Selected 06 -->
+            <article class="project-card">
+              <div class="media-frame">
+                <video muted loop playsinline preload="none" poster="">
+                  <source data-src="/media/experimental-toolkit.webm" type="video/webm" />
+                </video>
+                <div class="media-placeholder">
+                  <span>
+                    <strong>WEBM SLOT</strong>
+                    Experimental toolkit preview
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="project-title">Experimental Toolkit</h3>
+
+                <div class="project-meta">
+                  <span class="tag">Personal Project</span>
+                  <span class="tag">Astro</span>
+                  <span class="tag">React</span>
+                  <span class="tag">Components</span>
+                </div>
+
+                <p class="project-description">
+                  Placeholder for your sixth personal project. Use this space for a tool, website, component library,
+                  automation workflow or prototype that demonstrates your ability to structure reusable code.
+                </p>
+
+                <ul class="project-bullets">
+                  <li><strong>Role:</strong> Frontend structure, components and visual system.</li>
+                  <li><strong>Focus:</strong> Reusability, performance, documentation and interface consistency.</li>
+                  <li><strong>Result:</strong> A technical base that can be reused in future web projects.</li>
+                </ul>
+
+                <div class="project-links">
+                  <a href="#" target="_blank" rel="noreferrer">Demo</a>
+                  <a href="#" target="_blank" rel="noreferrer">Repository</a>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           EXPERIENCE
+           ====================================================== -->
+      <section
+        class="panel"
+        id="panel-experience"
+        role="tabpanel"
+        aria-labelledby="tab-experience"
+        data-panel="experience">
+
+        <div class="section-kicker">Work, practice and applied learning</div>
+        <h2 class="section-heading">Experience</h2>
+        <p class="section-intro">
+          Placeholder section for formal work, freelance projects, SENA productive stage and relevant practice.
+          Keep this short, factual and connected to software development tasks.
+        </p>
+
+        <div class="timeline">
+          <article class="experience-item">
+            <div class="experience-date">2026 — Present</div>
+            <div>
+              <h3 class="experience-title">Software Development Trainee</h3>
+              <p class="experience-org">SENA · Análisis y Desarrollo de Software</p>
+              <p class="experience-body">
+                Placeholder for your productive stage or apprenticeship profile. Describe the type of role you are
+                seeking or the tasks you are currently performing: frontend development, backend support, QA,
+                database management, documentation and agile collaboration.
+              </p>
+              <div class="project-meta">
+                <span class="tag">ADSO</span>
+                <span class="tag">Software Analysis</span>
+                <span class="tag">Web Development</span>
+                <span class="tag">Databases</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="experience-item">
+            <div class="experience-date">2025 — 2026</div>
+            <div>
+              <h3 class="experience-title">Freelance Web Developer</h3>
+              <p class="experience-org">Independent client work · Bogotá / Remote</p>
+              <p class="experience-body">
+                Placeholder for your four client projects. Mention the type of clients, deliverables and technologies.
+                Example: websites, landing pages, internal tools, dashboards, content structures, deployments
+                and interface improvements.
+              </p>
+              <div class="project-meta">
+                <span class="tag">Client Communication</span>
+                <span class="tag">HTML / CSS / JS</span>
+                <span class="tag">Responsive Design</span>
+                <span class="tag">Delivery</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="experience-item">
+            <div class="experience-date">2023 — 2025</div>
+            <div>
+              <h3 class="experience-title">Creative Technology Research</h3>
+              <p class="experience-org">Personal projects · Art, software and interaction</p>
+              <p class="experience-body">
+                Placeholder for your research-based practice. Explain how you explored creative coding, AI,
+                3D web experiences, narrative systems and digital interfaces through personal projects.
+              </p>
+              <div class="project-meta">
+                <span class="tag">Three.js</span>
+                <span class="tag">AI Research</span>
+                <span class="tag">Interaction</span>
+                <span class="tag">New Media</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ======================================================
+           CERTIFICATES
+           ====================================================== -->
+      <section
+        class="panel"
+        id="panel-certificates"
+        role="tabpanel"
+        aria-labelledby="tab-certificates"
+        data-panel="certificates">
+
+        <div class="section-kicker">Skills, education and certificates</div>
+        <h2 class="section-heading">Certificates</h2>
+        <p class="section-intro">
+          Use this section to compensate for limited formal experience by making your technical profile explicit.
+          Keep certificates honest, verifiable and connected to the skills used in your projects.
+        </p>
+
+        <div class="skills-grid" aria-label="Skills">
+          <div class="skill-block">
+            <h3>Frontend</h3>
+            <p>HTML, CSS, JavaScript, React, Astro, responsive interfaces, accessibility basics and UI structure.</p>
+          </div>
+
+          <div class="skill-block">
+            <h3>Backend</h3>
+            <p>Node.js basics, Python, MySQL, SQLite, CRUD logic, data handling and API fundamentals.</p>
+          </div>
+
+          <div class="skill-block">
+            <h3>Creative Tech</h3>
+            <p>Three.js, TouchDesigner, Unity, Blender, interactive systems, audiovisual interfaces and prototyping.</p>
+          </div>
+
+          <div class="skill-block">
+            <h3>Data / Tools</h3>
+            <p>Power BI, Tableau, Excel, Notion, Git, GitHub, Linux basics, documentation and project organization.</p>
+          </div>
+        </div>
+
+        <div class="cert-grid">
+          <article class="certificate-card">
+            <h3>SENA ADSO</h3>
+            <p>Tecnólogo en Análisis y Desarrollo de Software. Placeholder for current academic status, productive stage dates and training center.</p>
+            <div class="certificate-meta">Education · In progress</div>
+          </article>
+
+          <article class="certificate-card">
+            <h3>JavaScript Fundamentals</h3>
+            <p>Placeholder certificate for programming logic, DOM manipulation, functions, arrays, objects and asynchronous basics.</p>
+            <div class="certificate-meta">Certificate · Replace issuer</div>
+          </article>
+
+          <article class="certificate-card">
+            <h3>React / Frontend Development</h3>
+            <p>Placeholder certificate for component-based interfaces, state, props, routing and frontend project structure.</p>
+            <div class="certificate-meta">Certificate · Replace issuer</div>
+          </article>
+
+          <article class="certificate-card">
+            <h3>Databases / SQL</h3>
+            <p>Placeholder certificate for relational databases, SQL queries, schema design, CRUD operations and data modeling.</p>
+            <div class="certificate-meta">Certificate · Replace issuer</div>
+          </article>
+
+          <article class="certificate-card">
+            <h3>Python Basics</h3>
+            <p>Placeholder certificate for Python syntax, file handling, scripts, data processing and small application logic.</p>
+            <div class="certificate-meta">Certificate · Replace issuer</div>
+          </article>
+
+          <article class="certificate-card">
+            <h3>Git / GitHub</h3>
+            <p>Placeholder certificate for version control, repositories, branches, commits, collaboration and project documentation.</p>
+            <div class="certificate-meta">Certificate · Replace issuer</div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>© <span id="year"></span> Brayan Andrés Castillo Mesa / Blackars</span>
+      <span>Built as a readable CV web page for recruiters, RH and AI-assisted screening.</span>
+    </footer>
+  </div>
+
+  <script>
+    /* ==========================================================
+       Theme toggle
+       ========================================================== */
+
+    const root = document.documentElement;
+    const themeToggle = document.getElementById("themeToggle");
+
+    const savedTheme = localStorage.getItem("blackars-cv-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    function setTheme(theme) {
+      root.setAttribute("data-theme", theme);
+      localStorage.setItem("blackars-cv-theme", theme);
+      themeToggle.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+    }
+
+    setTheme(savedTheme || (prefersDark ? "dark" : "light"));
+
+    themeToggle.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme");
+      setTheme(current === "dark" ? "light" : "dark");
+    });
+
+    /* ==========================================================
+       Tabs
+       - Screen: shows one section at a time
+       - Print CSS: shows all panels continuously
+       ========================================================== */
+
+    const tabButtons = Array.from(document.querySelectorAll("[data-tab]"));
+    const panels = Array.from(document.querySelectorAll("[data-panel]"));
+
+    function activateTab(tabName, updateHash = true) {
+      tabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tabName;
+        button.setAttribute("aria-selected", String(isActive));
+      });
+
+      panels.forEach((panel) => {
+        panel.classList.toggle("is-active", panel.dataset.panel === tabName);
+      });
+
+      if (updateHash) {
+        history.replaceState(null, "", "#" + tabName);
+      }
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => activateTab(button.dataset.tab));
+    });
+
+    const initialHash = window.location.hash.replace("#", "");
+    if (["projects", "experience", "certificates"].includes(initialHash)) {
+      activateTab(initialHash, false);
+    }
+
+    /* ==========================================================
+       Lazy video loading
+       - Put the real path in source[data-src]
+       - Example: /media/minibase.webm
+       ========================================================== */
+
+    const videos = Array.from(document.querySelectorAll("video"));
+
+    function loadVideo(video) {
+      const source = video.querySelector("source[data-src]");
+      const placeholder = video.parentElement.querySelector(".media-placeholder");
+
+      if (!source || source.src) return;
+
+      const src = source.getAttribute("data-src");
+
+      // If the src is still a placeholder path, the video will fail silently.
+      source.src = src;
+      video.load();
+
+      video.addEventListener("canplay", () => {
+        placeholder?.remove();
+        video.play().catch(() => {
+          // Autoplay can fail in rare cases. Muted + playsinline usually works.
+        });
+      }, { once: true });
+    }
+
+    if ("IntersectionObserver" in window) {
+      const videoObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadVideo(entry.target);
+            videoObserver.unobserve(entry.target);
+          }
+        });
+      }, {
+        rootMargin: "200px 0px"
+      });
+
+      videos.forEach((video) => videoObserver.observe(video));
+    } else {
+      videos.forEach(loadVideo);
+    }
+
+    /* ==========================================================
+       Footer year
+       ========================================================== */
+
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
