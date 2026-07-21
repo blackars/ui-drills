@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mirror Split // Dynamic Axis Puzzle</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.14);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.8vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,38px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{min-height:0;display:grid;place-items:center;position:relative}
+    canvas{
+      width:min(96vw,1100px);
+      height:min(72vh,760px);
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      image-rendering:high-quality;
+    }
+
+    .overlay{
+      position:absolute;
+      width:min(96vw,1100px);
+      height:min(72vh,760px);
+      pointer-events:none;
+    }
+
+    .badge{
+      position:absolute;left:10px;top:10px;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+    }
+    .badge.on{opacity:1;transform:translateY(0)}
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,22px);letter-spacing:.2em;text-transform:uppercase;
+      opacity:0;transition:opacity 380ms var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      white-space:pre;text-align:center;
+    }
+    .message.show{opacity:1}
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @media (max-width:980px){
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Mirror Split · Dynamic Axis Puzzle</div>
+        <h1>Mirror Split</h1>
+      </div>
+      <div class="meta">
+        <span>inverse clone</span><span>·</span>
+        <span>dual target sync</span><span>·</span>
+        <span>moving symmetry axis</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <canvas id="game" width="1200" height="780"></canvas>
+      <div class="overlay">
+        <div class="badge" id="axisBadge">AXIS SHIFT</div>
+        <div class="message" id="message"></div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Nivel:</span> <b id="levelLabel">1</b></div>
+        <div><span>Movimientos:</span> <b id="movesLabel">0</b></div>
+        <div><span>Eje X:</span> <b id="axisLabel">0.50</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset nivel</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // ---------- DOM ----------
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+
+      const axisBadge = document.getElementById('axisBadge');
+      const messageEl = document.getElementById('message');
+
+      const levelLabel = document.getElementById('levelLabel');
+      const movesLabel = document.getElementById('movesLabel');
+      const axisLabel = document.getElementById('axisLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // ---------- Audio ----------
+      let soundOn = true;
+      let actx = null;
+      function audio(){ if(!soundOn) return null; if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+      function tone(f=440,d=.08,t='sine',g=.03,delay=0){
+        const c=audio(); if(!c) return;
+        const t0=c.currentTime+delay, o=c.createOscillator(), ga=c.createGain();
+        o.type=t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination); o.start(t0); o.stop(t0+d+0.02);
+      }
+      const sfx = {
+        move:()=>tone(340,.04,'triangle',.014),
+        block:()=>tone(180,.08,'triangle',.02),
+        shift:()=>{ tone(420,.06,'triangle',.028); tone(680,.08,'sine',.024,.05); },
+        win:()=>{ tone(480,.08,'sine',.03); tone(640,.1,'triangle',.03,.07); tone(860,.12,'sine',.028,.15); }
+      };
+
+      // ---------- Grid config ----------
+      const W = canvas.width, H = canvas.height;
+      const COLS = 14, ROWS = 10;
+      const CELL = 62;
+      const GRID_W = COLS * CELL;
+      const GRID_H = ROWS * CELL;
+      const OX = (W - GRID_W) * 0.5;
+      const OY = (H - GRID_H) * 0.54;
+
+      // ---------- Helpers ----------
+      const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+      const lerp = (a,b,t)=>a+(b-a)*t;
+      const key = (x,y)=>`${x},${y}`;
+      const inBounds = (x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
+
+      function showMessage(txt, ms=720){
+        messageEl.textContent = txt;
+        messageEl.classList.add('show');
+        clearTimeout(showMessage._t);
+        showMessage._t = setTimeout(()=>messageEl.classList.remove('show'), ms);
+      }
+
+      function flashAxisBadge(){
+        axisBadge.classList.add('on');
+        setTimeout(()=>axisBadge.classList.remove('on'), 300);
+      }
+
+      // ---------- Level data ----------
+      // axisPath: normalized X positions of symmetry axis (0..1)
+      const levels = [
+        {
+          player:{x:2,y:5},
+          goalA:{x:4,y:2},
+          goalB:{x:9,y:2},
+          blocks:[
+            [6,1],[6,2],[6,3],[6,4],[6,5],
+            [3,7],[4,7],[5,7],[8,7],[9,7],[10,7]
+          ],
+          axisPath:[0.50,0.47,0.53,0.50],
+          axisSpeed:0.10, // path interpolation speed
+          shiftEvery:4.0
+        },
+        {
+          player:{x:2,y:8},
+          goalA:{x:3,y:1},
+          goalB:{x:10,y:1},
+          blocks:[
+            [5,0],[5,1],[5,2],[5,3],[5,4],
+            [8,0],[8,1],[8,2],[8,3],[8,4],
+            [2,5],[3,5],[4,5],[9,5],[10,5],[11,5],
+            [6,7],[7,7]
+          ],
+          axisPath:[0.50,0.44,0.56,0.50,0.48,0.52],
+          axisSpeed:0.13,
+          shiftEvery:3.3
+        },
+        {
+          player:{x:1,y:8},
+          goalA:{x:2,y:1},
+          goalB:{x:11,y:1},
+          blocks:[
+            [4,1],[4,2],[4,3],[4,4],[4,5],[4,6],
+            [9,1],[9,2],[9,3],[9,4],[9,5],[9,6],
+            [5,6],[6,6],[7,6],[8,6],
+            [2,4],[3,4],[10,4],[11,4]
+          ],
+          axisPath:[0.50,0.40,0.60,0.46,0.54,0.50],
+          axisSpeed:0.16,
+          shiftEvery:2.8
+        }
+      ];
+
+      // ---------- State ----------
+      const st = {
+        running:true,
+        over:false,
+        level:0,
+        moves:0,
+
+        blocks:new Set(),
+        player:{x:0,y:0},
+        clone:{x:0,y:0},
+        goalA:{x:0,y:0},
+        goalB:{x:0,y:0},
+
+        // smooth movement animation
+        pDraw:{x:0,y:0},
+        cDraw:{x:0,y:0},
+        animT:1,
+        animDur:0.16,
+
+        // dynamic axis
+        axisXNorm:0.5,
+        axisPath:[],
+        axisNode:0,
+        axisSpeed:0.1,
+        shiftEvery:4,
+        shiftTimer:0,
+
+        won:false,
+        last:performance.now()
+      };
+
+      // ---------- Core mirror logic ----------
+      // Clone is reflection of player movement relative to moving vertical axis.
+      // If player moves dx,dy then clone moves -dx,dy.
+      function updateCloneFromPlayerImmediate(){
+        const ax = axisGridX();
+        // mirror player x around axis: x' = round(2*ax - x)
+        const mirroredX = Math.round(2*ax - st.player.x);
+        st.clone.x = mirroredX;
+        st.clone.y = st.player.y;
+      }
+
+      function axisGridX(){
+        // normalized 0..1 across grid columns [0..COLS-1]
+        return st.axisXNorm * (COLS - 1);
+      }
+
+      function isBlocked(x,y){
+        if(!inBounds(x,y)) return true;
+        return st.blocks.has(key(x,y));
+      }
+
+      function canOccupy(x,y,otherX,otherY){
+        if(isBlocked(x,y)) return false;
+        // prevent overlap between player and clone
+        if(x===otherX && y===otherY) return false;
+        return true;
+      }
+
+      function attemptMove(dx,dy){
+        if(!st.running || st.over || st.won) return;
+
+        const px = st.player.x + dx;
+        const py = st.player.y + dy;
+
+        // clone inverse on X
+        const cx = st.clone.x - dx;
+        const cy = st.clone.y + dy;
+
+        // validate both
+        if(
+          canOccupy(px,py, cx,cy) &&
+          canOccupy(cx,cy, px,py)
+        ){
+          st.player.x = px; st.player.y = py;
+          st.clone.x = cx; st.clone.y = cy;
+
+          st.moves++;
+          st.animT = 0;
+          sfx.move();
+          checkWin();
+        }else{
+          sfx.block();
+        }
+
+        updateHUD();
+      }
+
+      function checkWin(){
+        const a = st.player.x===st.goalA.x && st.player.y===st.goalA.y;
+        const b = st.clone.x===st.goalB.x && st.clone.y===st.goalB.y;
+        if(a && b){
+          st.won = true;
+          st.running = false;
+          stateLabel.textContent = 'Sincronizado';
+          showMessage('LOCKED PAIR', 1000);
+          sfx.win();
+
+          setTimeout(()=>{
+            if(st.level < levels.length-1){
+              st.level++;
+              loadLevel(st.level);
+              showMessage(`LEVEL ${st.level+1}`, 700);
+            }else{
+              st.over = true;
+              showMessage('SYSTEM CLEAR', 1600);
+              stateLabel.textContent = 'Completado';
+            }
+          }, 900);
+        }
+      }
+
+      // ---------- Axis dynamic ----------
+      function updateAxis(dt){
+        st.shiftTimer -= dt;
+        if(st.shiftTimer <= 0){
+          st.shiftTimer = st.shiftEvery;
+          st.axisNode = (st.axisNode + 1) % st.axisPath.length;
+          flashAxisBadge();
+          sfx.shift();
+        }
+
+        const target = st.axisPath[st.axisNode];
+        st.axisXNorm = lerp(st.axisXNorm, target, clamp(dt*st.axisSpeed*8,0,1));
+
+        // axis drift can invalidate overlap softly: clamp positions if needed
+        // recompute ideal mirror relation by nudging clone toward mirrored X with inertia
+        const idealX = Math.round(2*axisGridX() - st.player.x);
+        if(Math.abs(st.clone.x - idealX) > 0){
+          const step = Math.sign(idealX - st.clone.x);
+          const nx = st.clone.x + step;
+          if(!isBlocked(nx, st.clone.y) && !(nx===st.player.x && st.clone.y===st.player.y)){
+            st.clone.x = nx;
+          }
+        }
+      }
+
+      // ---------- Drawing ----------
+      function drawBackground(){
+        ctx.fillStyle = '#040404';
+        ctx.fillRect(0,0,W,H);
+
+        const g = ctx.createRadialGradient(W*0.5,H*0.55,120, W*0.5,H*0.55, H*0.78);
+        g.addColorStop(0,'rgba(255,255,255,0.03)');
+        g.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,W,H);
+      }
+
+      function drawGrid(){
+        // grid frame
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(OX,OY,GRID_W,GRID_H);
+
+        // inner lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        for(let x=1;x<COLS;x++){
+          const gx = OX + x*CELL;
+          ctx.beginPath(); ctx.moveTo(gx,OY); ctx.lineTo(gx,OY+GRID_H); ctx.stroke();
+        }
+        for(let y=1;y<ROWS;y++){
+          const gy = OY + y*CELL;
+          ctx.beginPath(); ctx.moveTo(OX,gy); ctx.lineTo(OX+GRID_W,gy); ctx.stroke();
+        }
+
+        // dynamic axis
+        const ax = OX + axisGridX()*CELL;
+        ctx.strokeStyle = 'rgba(255,255,255,0.36)';
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([8,6]);
+        ctx.beginPath();
+        ctx.moveTo(ax, OY-18);
+        ctx.lineTo(ax, OY+GRID_H+18);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      function cellCenter(x,y){
+        return {
+          x: OX + x*CELL + CELL*0.5,
+          y: OY + y*CELL + CELL*0.5
+        };
+      }
+
+      function drawBlock(x,y){
+        const c = cellCenter(x,y);
+        const s = CELL*0.78;
+        ctx.save();
+        ctx.translate(c.x,c.y);
+
+        // flat solid with soft shadow
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        ctx.fillRect(-s*0.5,-s*0.5,s,s);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.09)';
+        ctx.fillRect(s*0.5,-s*0.5,6,s);
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillRect(-s*0.5,s*0.5,s+6,6);
+
+        ctx.restore();
+      }
+
+      function drawGoal(x,y,alt=false){
+        const c = cellCenter(x,y);
+        const s = CELL*0.78;
+        ctx.save();
+        ctx.translate(c.x,c.y);
+
+        ctx.strokeStyle = alt ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.62)';
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(-s*0.5,-s*0.5,s,s);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+        ctx.strokeRect(-s*0.34,-s*0.34,s*0.68,s*0.68);
+
+        ctx.restore();
+      }
+
+      function drawPiece(drawPos, isClone=false){
+        const c = cellCenter(drawPos.x, drawPos.y);
+        const s = CELL*0.62;
+
+        ctx.save();
+        ctx.translate(c.x,c.y);
+
+        // shadow
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(-s*0.46, s*0.42, s*0.95, 4);
+
+        // top
+        ctx.fillStyle = isClone ? '#d8d8d8' : '#f2f2f2';
+        ctx.fillRect(-s*0.5,-s*0.5,s,s);
+
+        // sides
+        ctx.fillStyle = isClone ? '#bdbdbd' : '#cfcfcf';
+        ctx.fillRect(s*0.5,-s*0.5,6,s);
+        ctx.fillStyle = isClone ? '#a5a5a5' : '#b3b3b3';
+        ctx.fillRect(-s*0.5,s*0.5,s+6,6);
+
+        ctx.restore();
+      }
+
+      function drawScene(dt){
+        drawBackground();
+        drawGrid();
+
+        // goals
+        drawGoal(st.goalA.x, st.goalA.y, false);
+        drawGoal(st.goalB.x, st.goalB.y, true);
+
+        // blocks
+        for(const b of st.blocks){
+          const [x,y] = b.split(',').map(Number);
+          drawBlock(x,y);
+        }
+
+        // animated draw positions
+        st.animT = Math.min(1, st.animT + dt / st.animDur);
+        const t = st.animT;
+        st.pDraw.x = lerp(st.pDraw.x, st.player.x, t);
+        st.pDraw.y = lerp(st.pDraw.y, st.player.y, t);
+        st.cDraw.x = lerp(st.cDraw.x, st.clone.x, t);
+        st.cDraw.y = lerp(st.cDraw.y, st.clone.y, t);
+
+        drawPiece(st.pDraw, false);
+        drawPiece(st.cDraw, true);
+      }
+
+      // ---------- HUD ----------
+      function updateHUD(){
+        levelLabel.textContent = st.level + 1;
+        movesLabel.textContent = st.moves;
+        axisLabel.textContent = st.axisXNorm.toFixed(2);
+      }
+
+      // ---------- Level ----------
+      function loadLevel(i){
+        const lv = levels[i];
+        st.level = i;
+        st.moves = 0;
+        st.won = false;
+        st.over = false;
+        st.running = true;
+
+        st.blocks = new Set(lv.blocks.map(([x,y])=>key(x,y)));
+
+        st.player = {x:lv.player.x, y:lv.player.y};
+        st.goalA = {...lv.goalA};
+        st.goalB = {...lv.goalB};
+
+        st.axisPath = [...lv.axisPath];
+        st.axisNode = 0;
+        st.axisXNorm = lv.axisPath[0];
+        st.axisSpeed = lv.axisSpeed;
+        st.shiftEvery = lv.shiftEvery;
+        st.shiftTimer = lv.shiftEvery;
+
+        // clone starts mirrored from player
+        updateCloneFromPlayerImmediate();
+
+        st.pDraw = {x:st.player.x, y:st.player.y};
+        st.cDraw = {x:st.clone.x, y:st.clone.y};
+        st.animT = 1;
+
+        stateLabel.textContent = 'Activo';
+        pauseBtn.textContent = 'Pause';
+        updateHUD();
+      }
+
+      // ---------- Controls ----------
+      const keys = new Set();
+      window.addEventListener('keydown', e=>{
+        const k = e.key.toLowerCase();
+        if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(k)) e.preventDefault();
+        keys.add(k);
+
+        if(!st.running || st.over || st.won) return;
+
+        if(k==='arrowup' || k==='w') attemptMove(0,-1);
+        else if(k==='arrowdown' || k==='s') attemptMove(0,1);
+        else if(k==='arrowleft' || k==='a') attemptMove(-1,0);
+        else if(k==='arrowright' || k==='d') attemptMove(1,0);
+      });
+      window.addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+
+      function togglePause(){
+        if(st.over) return;
+        st.running = !st.running;
+        pauseBtn.textContent = st.running ? 'Pause' : 'Resume';
+        stateLabel.textContent = st.running ? 'Activo' : 'Pausado';
+      }
+
+      function resetCurrent(){
+        loadLevel(st.level);
+        showMessage('RESET', 340);
+      }
+
+      // ---------- Loop ----------
+      function loop(now){
+        const dt = Math.min(0.05, (now - st.last)/1000);
+        st.last = now;
+
+        if(st.running && !st.over && !st.won){
+          updateAxis(dt);
+        }
+
+        drawScene(dt);
+        requestAnimationFrame(loop);
+      }
+
+      // ---------- Buttons ----------
+      soundBtn.addEventListener('click', ()=>{
+        soundOn = !soundOn;
+        soundBtn.textContent = `Sound: ${soundOn ? 'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', resetCurrent);
+
+      // ---------- Start ----------
+      loadLevel(0);
+      showMessage('LEVEL 1', 700);
+      st.last = performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

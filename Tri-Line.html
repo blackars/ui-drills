@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tri-Line v2 // Cinema Minimal</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.18);
+      --line-soft:rgba(255,255,255,.08);
+      --glow:rgba(255,255,255,.28);
+      --ease:cubic-bezier(.2,.8,.2,1);
+      --t-fast:220ms;
+      --t-med:420ms;
+      --t-slow:820ms;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;
+      overflow:hidden;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -10%, rgba(255,255,255,.08), transparent 42%),
+        radial-gradient(circle at 100% 100%, rgba(255,255,255,.04), transparent 28%),
+        linear-gradient(180deg,#060606 0%, #020202 100%);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      gap:16px;
+      padding:clamp(12px,2vw,24px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+      opacity:0;transform:translateY(-6px);
+      animation:fadeIn var(--t-med) var(--ease) forwards;
+    }
+
+    .title{display:grid;gap:6px}
+    .eyebrow{
+      font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);
+    }
+    h1{
+      font-size:clamp(22px,4.8vw,54px);
+      line-height:.9;letter-spacing:-.05em;font-weight:620;
+    }
+
+    .meta{
+      display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;
+      font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7;
+    }
+    .meta span{opacity:.82}
+
+    .stage{
+      min-height:0;
+      position:relative;
+      display:grid;place-items:center;
+      opacity:0;transform:translateY(8px);
+      animation:fadeIn var(--t-med) var(--ease) 80ms forwards;
+    }
+
+    .board-shell{
+      width:min(78vmin,560px);
+      aspect-ratio:1/1;
+      position:relative;
+      display:grid;place-items:center;
+    }
+
+    /* Grid en forma de # (solo 4 líneas, sin cajas) */
+    .hash-grid{
+      position:absolute;inset:0;
+      pointer-events:none;
+    }
+    .hash-grid .v,
+    .hash-grid .h{
+      position:absolute;background:var(--line);
+      box-shadow:0 0 10px rgba(255,255,255,.08);
+    }
+    .hash-grid .v{top:0;bottom:0;width:1px}
+    .hash-grid .h{left:0;right:0;height:1px}
+
+    .hash-grid .v.l1{left:33.3333%}
+    .hash-grid .v.l2{left:66.6666%}
+    .hash-grid .h.l1{top:33.3333%}
+    .hash-grid .h.l2{top:66.6666%}
+
+    /* 9 zonas clickeables invisibles */
+    .cells{
+      position:absolute;inset:0;
+      display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    }
+
+    .cell{
+      border:none;background:transparent;cursor:pointer;position:relative;
+      transition:transform var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+    }
+    .cell:hover{transform:scale(1.01)}
+    .cell:active{transform:scale(.985)}
+    .cell.locked{cursor:default}
+
+    .piece{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.62);
+      opacity:0;animation:place var(--t-med) var(--ease) forwards;
+      filter:drop-shadow(0 0 12px rgba(255,255,255,.08));
+    }
+
+    .piece.circle{
+      width:46%;height:46%;
+      border:2px solid #f3f3f3;
+      background:transparent;
+    }
+
+    .piece.square{
+      width:42%;height:42%;
+      background:#d9d9d9;
+      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 0 14px rgba(255,255,255,.12);
+    }
+
+    .win-line{
+      position:absolute;height:1px;
+      left:0;top:0;width:0;
+      transform-origin:left center;
+      background:linear-gradient(90deg, transparent 0%, #fff 50%, transparent 100%);
+      box-shadow:0 0 14px var(--glow);
+      opacity:0;pointer-events:none;
+    }
+    .win-line.show{animation:draw var(--t-med) var(--ease) forwards}
+
+    .cinema-wipe{
+      position:absolute;inset:-20%;
+      background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.14) 49%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.14) 51%, transparent 100%);
+      transform:translateX(-130%);
+      opacity:0;pointer-events:none;
+      mix-blend-mode:screen;
+    }
+    .cinema-wipe.play{animation:wipe var(--t-slow) var(--ease)}
+
+    .bottom{
+      display:grid;gap:10px;
+      opacity:0;transform:translateY(8px);
+      animation:fadeIn var(--t-med) var(--ease) 130ms forwards;
+    }
+
+    .status{
+      display:flex;flex-wrap:wrap;gap:14px;
+      font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+
+    .score{
+      display:flex;gap:14px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7;
+    }
+    .score b{font-size:16px;letter-spacing:-.02em;color:#fff;margin-left:6px}
+
+    .controls{
+      display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    }
+    button, select{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:10px 12px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+      transition:all var(--t-fast) var(--ease);
+    }
+    button:hover, select:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    button:active{transform:scale(.98)}
+    .active{
+      background:#efefef;color:#050505;border-color:#efefef;
+    }
+
+    @keyframes place{
+      0%{opacity:0;transform:translate(-50%,-50%) scale(.62)}
+      70%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}
+      100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    }
+    @keyframes draw{
+      from{opacity:1;transform:rotate(var(--a)) scaleX(0)}
+      to{opacity:1;transform:rotate(var(--a)) scaleX(1)}
+    }
+    @keyframes wipe{
+      0%{transform:translateX(-130%);opacity:0}
+      25%{opacity:.7}
+      100%{transform:translateX(130%);opacity:0}
+    }
+    @keyframes fadeIn{to{opacity:1;transform:translateY(0)}}
+
+    @media (max-width:760px){
+      .app{padding:10px}
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+      .board-shell{width:min(94vw,560px)}
+      .controls{gap:6px}
+      button,select{padding:9px 10px;font-size:10px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Tri-Line v2 · Cinema</div>
+        <h1>3 en línea</h1>
+      </div>
+      <div class="meta">
+        <span>IA opcional</span>
+        <span>·</span>
+        <span>3 tonos</span>
+        <span>·</span>
+        <span>modo cinema</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <div class="board-shell">
+        <div class="hash-grid" aria-hidden="true">
+          <div class="v l1"></div><div class="v l2"></div>
+          <div class="h l1"></div><div class="h l2"></div>
+        </div>
+        <div class="cells" id="cells"></div>
+        <div class="win-line" id="winLine"></div>
+        <div class="cinema-wipe" id="wipe"></div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Turno:</span> <b id="turnLabel">Círculo</b></div>
+        <div><span>Ronda:</span> <b id="roundLabel">1/5</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Jugando</b></div>
+        <div><span>Modo:</span> <b id="modeLabel">Humano vs Humano</b></div>
+      </div>
+
+      <div class="score">
+        <div>Círculo<b id="scoreO">0</b></div>
+        <div>Cuadrado<b id="scoreS">0</b></div>
+        <div>Empates<b id="scoreD">0</b></div>
+      </div>
+
+      <div class="controls">
+        <button id="modeBtn">Vs Bot: Off</button>
+        <button id="cinemaBtn" class="active">Cinema: On</button>
+        <button id="soundBtn" class="active">Sound: On</button>
+        <select id="botSide">
+          <option value="S">Bot = Cuadrado</option>
+          <option value="O">Bot = Círculo</option>
+        </select>
+        <button id="nextBtn">Siguiente ronda</button>
+        <button id="resetRoundBtn">Reiniciar ronda</button>
+        <button id="resetMatchBtn">Reiniciar match</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // ---------- DOM ----------
+      const cellsEl = document.getElementById('cells');
+      const winLineEl = document.getElementById('winLine');
+      const wipeEl = document.getElementById('wipe');
+
+      const turnLabel = document.getElementById('turnLabel');
+      const roundLabel = document.getElementById('roundLabel');
+      const stateLabel = document.getElementById('stateLabel');
+      const modeLabel = document.getElementById('modeLabel');
+
+      const scoreOEl = document.getElementById('scoreO');
+      const scoreSEl = document.getElementById('scoreS');
+      const scoreDEl = document.getElementById('scoreD');
+
+      const modeBtn = document.getElementById('modeBtn');
+      const cinemaBtn = document.getElementById('cinemaBtn');
+      const soundBtn = document.getElementById('soundBtn');
+      const botSideSelect = document.getElementById('botSide');
+
+      const nextBtn = document.getElementById('nextBtn');
+      const resetRoundBtn = document.getElementById('resetRoundBtn');
+      const resetMatchBtn = document.getElementById('resetMatchBtn');
+
+      // ---------- State ----------
+      const WIN = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+
+      const st = {
+        board:Array(9).fill(null), // O | S | null
+        turn:'O',
+        locked:false,
+        round:1,
+        maxRounds:5,
+        score:{O:0,S:0,D:0},
+        roundFinished:false,
+        vsBot:false,
+        botSide:'S',
+        cinema:true,
+        sound:true
+      };
+
+      // ---------- Audio (3 tonos) ----------
+      let actx = null;
+      function ensureAudio(){
+        if(!st.sound) return null;
+        if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        return actx;
+      }
+      function tone(freq=440, dur=0.08, type='sine', gain=0.03, delay=0){
+        const ctx = ensureAudio(); if(!ctx) return;
+        const t0 = ctx.currentTime + delay;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type; o.frequency.setValueAtTime(freq, t0);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(gain, t0+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+        o.connect(g).connect(ctx.destination);
+        o.start(t0); o.stop(t0+dur+0.02);
+      }
+      const sfx = {
+        place(){ tone(420,.07,'sine',.028); },
+        win(){
+          tone(520,.08,'sine',.03,0);
+          tone(650,.09,'triangle',.03,0.06);
+          tone(820,.12,'sine',.03,0.12);
+        },
+        draw(){
+          tone(260,.08,'triangle',.024,0);
+          tone(220,.10,'sine',.024,0.07);
+        }
+      };
+
+      // ---------- Utils ----------
+      const sleep = ms => new Promise(r=>setTimeout(r,ms));
+      const rnd = arr => arr[(Math.random()*arr.length)|0];
+
+      function labelOf(p){ return p==='O' ? 'Círculo' : 'Cuadrado'; }
+      function opposite(p){ return p==='O' ? 'S' : 'O'; }
+
+      function checkResult(board=st.board){
+        for(const pat of WIN){
+          const [a,b,c] = pat;
+          if(board[a] && board[a]===board[b] && board[a]===board[c]){
+            return {win:true, winner:board[a], pattern:pat, draw:false};
+          }
+        }
+        const draw = board.every(Boolean);
+        return {win:false, winner:null, pattern:null, draw};
+      }
+
+      // ---------- Render ----------
+      function render(){
+        cellsEl.innerHTML = '';
+        winLineEl.classList.remove('show');
+        winLineEl.style.opacity = '0';
+
+        for(let i=0;i<9;i++){
+          const btn = document.createElement('button');
+          btn.className = 'cell' + (st.locked ? ' locked' : '');
+          btn.type = 'button';
+          btn.dataset.i = i;
+          btn.addEventListener('click', ()=>handleMove(i));
+
+          const v = st.board[i];
+          if(v){
+            const piece = document.createElement('div');
+            piece.className = `piece ${v==='O' ? 'circle':'square'}`;
+            btn.appendChild(piece);
+            btn.classList.add('locked');
+          }
+          cellsEl.appendChild(btn);
+        }
+
+        turnLabel.textContent = labelOf(st.turn);
+        roundLabel.textContent = `${st.round}/${st.maxRounds}`;
+        if(!st.roundFinished) stateLabel.textContent = 'Jugando';
+        modeLabel.textContent = st.vsBot ? `Humano vs Bot (${labelOf(st.botSide)})` : 'Humano vs Humano';
+
+        scoreOEl.textContent = st.score.O;
+        scoreSEl.textContent = st.score.S;
+        scoreDEl.textContent = st.score.D;
+      }
+
+      function drawWinLine(pattern){
+        const rect = cellsEl.getBoundingClientRect();
+        const c = idx => {
+          const cell = cellsEl.children[idx].getBoundingClientRect();
+          return { x: cell.left - rect.left + cell.width/2, y: cell.top - rect.top + cell.height/2 };
+        };
+
+        const a = c(pattern[0]);
+        const b = c(pattern[2]);
+        const dx = b.x-a.x, dy = b.y-a.y;
+        const len = Math.hypot(dx,dy);
+        const ang = Math.atan2(dy,dx)*180/Math.PI;
+
+        winLineEl.style.left = `${a.x}px`;
+        winLineEl.style.top = `${a.y}px`;
+        winLineEl.style.width = `${len}px`;
+        winLineEl.style.setProperty('--a', `${ang}deg`);
+
+        winLineEl.classList.remove('show');
+        void winLineEl.offsetWidth;
+        winLineEl.style.opacity = '1';
+        winLineEl.classList.add('show');
+      }
+
+      function playWipe(){
+        if(!st.cinema) return;
+        wipeEl.classList.remove('play');
+        void wipeEl.offsetWidth;
+        wipeEl.classList.add('play');
+      }
+
+      // ---------- Bot (minimax simple) ----------
+      function bestBotMove(board, bot, human){
+        // primero ganar si puede
+        for(let i=0;i<9;i++){
+          if(!board[i]){
+            const t=[...board]; t[i]=bot;
+            if(checkResult(t).win) return i;
+          }
+        }
+        // bloquear humano
+        for(let i=0;i<9;i++){
+          if(!board[i]){
+            const t=[...board]; t[i]=human;
+            if(checkResult(t).win) return i;
+          }
+        }
+        // centro, esquinas, lados
+        if(!board[4]) return 4;
+        const corners=[0,2,6,8].filter(i=>!board[i]);
+        if(corners.length) return rnd(corners);
+        const sides=[1,3,5,7].filter(i=>!board[i]);
+        return sides.length ? rnd(sides) : -1;
+      }
+
+      // ---------- Game flow ----------
+      async function handleMove(i){
+        if(st.locked || st.board[i]) return;
+
+        // si vs bot y turno bot, ignora click humano
+        if(st.vsBot && st.turn===st.botSide) return;
+
+        place(i, st.turn);
+        sfx.place();
+
+        const res = checkResult();
+        if(await endIfNeeded(res)) return;
+
+        st.turn = opposite(st.turn);
+        render();
+
+        // turno bot
+        if(st.vsBot && !st.locked && st.turn===st.botSide){
+          st.locked = true; render();
+          await sleep(st.cinema ? 620 : 240);
+          const m = bestBotMove(st.board, st.botSide, opposite(st.botSide));
+          if(m>=0){
+            st.locked = false;
+            place(m, st.turn);
+            sfx.place();
+            const r2 = checkResult();
+            if(await endIfNeeded(r2)) return;
+            st.turn = opposite(st.turn);
+          }
+          st.locked = false;
+          render();
+        }
+      }
+
+      function place(i,p){
+        st.board[i]=p;
+        render();
+      }
+
+      async function endIfNeeded(res){
+        if(res.win){
+          st.locked = true;
+          st.roundFinished = true;
+          st.score[res.winner]++;
+          drawWinLine(res.pattern);
+          stateLabel.textContent = `Gana ${labelOf(res.winner)}`;
+          sfx.win();
+          render();
+          await autoNext();
+          return true;
+        }
+        if(res.draw){
+          st.locked = true;
+          st.roundFinished = true;
+          st.score.D++;
+          stateLabel.textContent = 'Empate';
+          sfx.draw();
+          render();
+          await autoNext();
+          return true;
+        }
+        return false;
+      }
+
+      async function autoNext(){
+        const needed = 3;
+        if(st.score.O>=needed || st.score.S>=needed){
+          stateLabel.textContent = `Match: ${st.score.O>st.score.S?'Círculo':'Cuadrado'}`;
+          render();
+          return;
+        }
+        if(st.round>=st.maxRounds){
+          if(st.score.O===st.score.S) stateLabel.textContent='Match empatado';
+          else stateLabel.textContent=`Match: ${st.score.O>st.score.S?'Círculo':'Cuadrado'}`;
+          render();
+          return;
+        }
+
+        await sleep(st.cinema ? 1400 : 650);
+        nextRound();
+      }
+
+      function resetRound(keepScore=true){
+        st.board = Array(9).fill(null);
+        st.roundFinished = false;
+        st.locked = false;
+        st.turn = st.round % 2 ? 'O':'S';
+        stateLabel.textContent = 'Jugando';
+        if(!keepScore){
+          st.score={O:0,S:0,D:0};
+          st.round=1;
+        }
+        playWipe();
+        render();
+
+        // si bot empieza
+        if(st.vsBot && st.turn===st.botSide){
+          setTimeout(async ()=>{
+            st.locked=true; render();
+            await sleep(st.cinema ? 620 : 240);
+            const m = bestBotMove(st.board, st.botSide, opposite(st.botSide));
+            st.locked=false;
+            if(m>=0){
+              place(m, st.turn); sfx.place();
+              const r = checkResult();
+              if(!(await endIfNeeded(r))){
+                st.turn = opposite(st.turn);
+                render();
+              }
+            }
+          }, st.cinema ? 180 : 40);
+        }
+      }
+
+      function nextRound(){
+        if(st.round>=st.maxRounds) return;
+        st.round++;
+        resetRound(true);
+      }
+
+      function resetMatch(){
+        st.score={O:0,S:0,D:0};
+        st.round=1;
+        resetRound(true);
+      }
+
+      // ---------- Controls ----------
+      modeBtn.addEventListener('click', ()=>{
+        st.vsBot = !st.vsBot;
+        modeBtn.textContent = `Vs Bot: ${st.vsBot ? 'On':'Off'}`;
+        modeBtn.classList.toggle('active', st.vsBot);
+        resetRound(true);
+      });
+
+      cinemaBtn.addEventListener('click', ()=>{
+        st.cinema = !st.cinema;
+        cinemaBtn.textContent = `Cinema: ${st.cinema ? 'On':'Off'}`;
+        cinemaBtn.classList.toggle('active', st.cinema);
+        document.documentElement.style.setProperty('--t-fast', st.cinema ? '320ms':'180ms');
+        document.documentElement.style.setProperty('--t-med', st.cinema ? '700ms':'320ms');
+        document.documentElement.style.setProperty('--t-slow', st.cinema ? '1200ms':'620ms');
+      });
+
+      soundBtn.addEventListener('click', ()=>{
+        st.sound = !st.sound;
+        soundBtn.textContent = `Sound: ${st.sound ? 'On':'Off'}`;
+        soundBtn.classList.toggle('active', st.sound);
+        if(st.sound) ensureAudio();
+      });
+
+      botSideSelect.addEventListener('change', ()=>{
+        st.botSide = botSideSelect.value;
+        resetRound(true);
+      });
+
+      nextBtn.addEventListener('click', ()=>nextRound());
+      resetRoundBtn.addEventListener('click', ()=>resetRound(true));
+      resetMatchBtn.addEventListener('click', ()=>resetMatch());
+
+      window.addEventListener('resize', ()=>{
+        const r = checkResult();
+        if(r.win) drawWinLine(r.pattern);
+      });
+
+      // init
+      render();
+    })();
+  </script>
+</body>
+</html>

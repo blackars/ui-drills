@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pacman Refractor v2.1</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f1f1f1;
+      --muted:#8d8d8d;
+      --line:rgba(255,255,255,.16);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+
+      --cell:26px;
+      --cols:27;
+      --rows:19;
+
+      --t-fast:170ms;
+      --t-med:420ms;
+      --t-slow:900ms;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.6vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,36px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{
+      min-height:0;
+      display:grid;place-items:center;
+      position:relative;
+    }
+
+    .arena{
+      position:relative;
+      width:calc(var(--cols) * var(--cell));
+      height:calc(var(--rows) * var(--cell));
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      overflow:hidden;
+      max-width:100%;
+      max-height:100%;
+    }
+
+    .layer{position:absolute;inset:0}
+    .gridHint{
+      position:absolute;inset:0;pointer-events:none;opacity:.06;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px);
+      background-size:var(--cell) var(--cell);
+    }
+
+    .wall{
+      position:absolute;
+      width:var(--cell);height:var(--cell);
+      background:rgba(255,255,255,.14);
+      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
+      transition:transform var(--t-slow) var(--ease), opacity var(--t-med) var(--ease), background var(--t-med) var(--ease);
+    }
+    .wall.refracting{background:rgba(255,255,255,.24)}
+
+    .dot{
+      position:absolute;
+      width:calc(var(--cell) * .24);
+      height:calc(var(--cell) * .24);
+      transform:translate(-50%,-50%);
+      background:#f2f2f2;
+      box-shadow:0 0 8px rgba(255,255,255,.22);
+      animation:pulse 1.5s ease-in-out infinite;
+      transition:opacity 120ms var(--ease), transform 120ms var(--ease);
+    }
+    .dot.eaten{opacity:0;transform:translate(-50%,-50%) scale(.15)}
+
+    .player{
+      position:absolute;
+      width:calc(var(--cell)*.78);
+      height:calc(var(--cell)*.78);
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 0 0 1px rgba(255,255,255,.12) inset, 0 0 14px rgba(255,255,255,.16);
+      z-index:4;
+      transition:left 105ms linear, top 105ms linear, transform 90ms linear;
+      overflow:hidden;
+    }
+    .player::before{
+      content:"";
+      position:absolute;
+      right:-2px; top:50%;
+      width:58%; height:58%;
+      background:#030303;
+      transform:translateY(-50%) rotate(0deg);
+      clip-path:polygon(0 50%, 100% 0, 100% 100%);
+      transform-origin:left center;
+      animation:chomp .2s ease-in-out infinite alternate;
+    }
+
+    .ghost{
+      position:absolute;
+      width:calc(var(--cell)*.8);
+      height:calc(var(--cell)*.8);
+      transform:translate(-50%,-50%);
+      z-index:4;
+      transition:left 145ms linear, top 145ms linear;
+      filter:drop-shadow(0 0 10px rgba(255,255,255,.14));
+    }
+    .ghost::before{
+      content:"";
+      position:absolute;inset:0;
+      clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+      background:rgba(230,230,230,.95);
+      animation:spin 1.2s linear infinite;
+    }
+    .ghost.g2::before{background:rgba(205,205,205,.95);animation-duration:1.45s}
+    .ghost.g3::before{background:rgba(180,180,180,.95);animation-duration:.95s}
+    .ghost.scatter::before{box-shadow:0 0 0 1px rgba(255,255,255,.2) inset, 0 0 16px rgba(255,255,255,.18)}
+    .ghost.chase::before{box-shadow:0 0 0 1px rgba(255,255,255,.08) inset}
+
+    .phaseOverlay{
+      position:absolute;inset:0;pointer-events:none;opacity:0;
+      background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.14) 49%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.14) 51%, transparent 100%);
+      transform:translateX(-120%);
+      mix-blend-mode:screen;
+    }
+    .phaseOverlay.play{animation:phaseSweep 2s var(--ease) forwards}
+
+    .phaseBadge{
+      position:absolute;left:10px;top:10px;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+      z-index:6;
+    }
+    .phaseBadge.on{opacity:1;transform:translateY(0)}
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,20px);letter-spacing:.18em;text-transform:uppercase;
+      opacity:0;transition:opacity var(--t-med) var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      z-index:7;
+    }
+    .message.show{opacity:1}
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes pulse{0%,100%{opacity:.8}50%{opacity:1}}
+    @keyframes phaseSweep{
+      0%{transform:translateX(-120%);opacity:0}
+      15%{opacity:.8}
+      100%{transform:translateX(120%);opacity:0}
+    }
+    @keyframes chomp{
+      from{transform:translateY(-50%) rotate(-22deg)}
+      to{transform:translateY(-50%) rotate(22deg)}
+    }
+
+    @media (max-width:1200px){ :root{ --cell:min(3.4vw,24px); } }
+    @media (max-width:900px){
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+      :root{ --cell:min(3.6vw,22px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Pacman Refractor v2.1</div>
+        <h1>Refractor</h1>
+      </div>
+      <div class="meta">
+        <span>3 vidas</span><span>·</span>
+        <span>túneles laterales</span><span>·</span>
+        <span>scatter/chase</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <div class="arena">
+        <div class="gridHint"></div>
+        <div class="layer" id="mazeLayer"></div>
+        <div class="layer" id="dotLayer"></div>
+        <div class="layer" id="entityLayer"></div>
+        <div class="layer">
+          <div class="phaseOverlay" id="phaseOverlay"></div>
+          <div class="phaseBadge" id="phaseBadge">PHASE WINDOW</div>
+          <div class="message" id="message"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Puntaje:</span> <b id="scoreLabel">0</b></div>
+        <div><span>Vidas:</span> <b id="livesLabel">3</b></div>
+        <div><span>Dots restantes:</span> <b id="dotsLeftLabel">0</b></div>
+        <div><span>Modo fantasmas:</span> <b id="ghostModeLabel">Scatter</b></div>
+        <div><span>Tiempo mapa:</span> <b id="timerLabel">30</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset nivel</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // CONFIG
+      const COLS = 27, ROWS = 19;
+      const MAP_INTERVAL = 30;
+      const PHASE_DURATION = 2;
+      const PLAYER_STEP = 0.115;
+      const GHOST_STEP = 0.165;
+      const START_LIVES = 3;
+
+      // Scatter/chase cycles (segundos)
+      // Pacman-like simplificado
+      const GHOST_PHASES = [
+        {mode:'scatter', t:7},
+        {mode:'chase', t:20},
+        {mode:'scatter', t:7},
+        {mode:'chase', t:20},
+        {mode:'scatter', t:5},
+        {mode:'chase', t:9999}
+      ];
+
+      // DOM
+      const mazeLayer = document.getElementById('mazeLayer');
+      const dotLayer = document.getElementById('dotLayer');
+      const entityLayer = document.getElementById('entityLayer');
+      const phaseOverlay = document.getElementById('phaseOverlay');
+      const phaseBadge = document.getElementById('phaseBadge');
+      const messageEl = document.getElementById('message');
+
+      const scoreLabel = document.getElementById('scoreLabel');
+      const livesLabel = document.getElementById('livesLabel');
+      const dotsLeftLabel = document.getElementById('dotsLeftLabel');
+      const ghostModeLabel = document.getElementById('ghostModeLabel');
+      const timerLabel = document.getElementById('timerLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // AUDIO
+      let ctx=null, soundOn=true;
+      function audio(){ if(!soundOn) return null; if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+      function tone(f=440,d=.08,t='sine',g=.03,delay=0){
+        const c=audio(); if(!c) return;
+        const t0=c.currentTime+delay, o=c.createOscillator(), ga=c.createGain();
+        o.type=t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination); o.start(t0); o.stop(t0+d+0.02);
+      }
+      const sfx={
+        dot(){ tone(540,.05,'sine',.028); },
+        phase(){ tone(380,.07,'triangle',.03); tone(620,.09,'sine',.03,.08); tone(820,.1,'sine',.028,.16); },
+        hit(){ tone(180,.12,'triangle',.04); tone(140,.15,'sine',.03,.06); },
+        lifeLost(){ tone(220,.1,'triangle',.03); tone(180,.12,'sine',.028,.08); },
+        win(){ tone(460,.08,'sine',.03); tone(620,.1,'triangle',.03,.07); tone(880,.12,'sine',.03,.16); }
+      };
+
+      // MAPS (27x19)
+      const layouts = [
+        [
+          "111111111111101111111111111",
+          "100000000000100000000000001",
+          "101111011110101111011110101",
+          "101000010000000001000010101",
+          "101011110111111101111010101",
+          "100010000100000100000010001",
+          "111010111101110111101010111",
+          "100000100000100000001000001",
+          "101110101111101111101011101",
+          "000000001000000000100000000", // túnel fila 9 (abierto extremos)
+          "101110101111101111101011101",
+          "100000100000100000001000001",
+          "111010111101110111101010111",
+          "100010000100000100000010001",
+          "101011110111111101111010101",
+          "101000010000000001000010101",
+          "101111011110101111011110101",
+          "100000000000100000000000001",
+          "111111111111101111111111111"
+        ],
+        [
+          "111111111111101111111111111",
+          "100000010000100000100000001",
+          "101111010111101110101111101",
+          "100001000100001000100000001",
+          "111101111101111011111101111",
+          "100100000000000000000001001",
+          "101101111010111110111101101",
+          "100000001000100010000000001",
+          "101111101111101011111111101",
+          "000000100000000000001000000", // túnel
+          "101111101111101011111111101",
+          "100000001000100010000000001",
+          "101101111010111110111101101",
+          "100100000000000000000001001",
+          "111101111101111011111101111",
+          "100001000100001000100000001",
+          "101111010111101110101111101",
+          "100000010000100000100000001",
+          "111111111111101111111111111"
+        ],
+        [
+          "111111111111101111111111111",
+          "100000000000000000000000001",
+          "101111011111111111110111101",
+          "100001000100000001000100001",
+          "111101110101111101011101111",
+          "100100000000100000000001001",
+          "101101111111101111111101101",
+          "100000001000100010000000001",
+          "101111101010101010111111101",
+          "000000100010000010001000000", // túnel
+          "101111101010101010111111101",
+          "100000001000100010000000001",
+          "101101111111101111111101101",
+          "100100000000100000000001001",
+          "111101110101111101011101111",
+          "100001000100000001000100001",
+          "101111011111111111110111101",
+          "100000000000000000000000001",
+          "111111111111101111111111111"
+        ]
+      ];
+
+      // STATE
+      const st = {
+        running:true, over:false, won:false,
+        score:0, lives:START_LIVES,
+        dotsTotal:0, dotsEaten:0,
+        countdown:MAP_INTERVAL,
+        phase:false, phaseLeft:0,
+        layoutIdx:0,
+        walls:new Set(),
+        wallEls:new Map(),
+        dots:new Set(),
+        dotEls:new Map(),
+
+        player:null,
+        ghosts:[],
+
+        ghostMode:'scatter',
+        ghostPhaseIndex:0,
+        ghostPhaseLeft:GHOST_PHASES[0].t,
+
+        last:performance.now(),
+        respawning:false
+      };
+
+      // HELPERS
+      const key=(x,y)=>`${x},${y}`;
+      const inside=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
+      const isWall=(x,y)=>!inside(x,y)||st.walls.has(key(x,y));
+      const px=c=>c*26+13; // cell fixed to CSS var base (26)
+      const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
+
+      function setMessage(text, show=true){
+        messageEl.textContent=text;
+        messageEl.classList.toggle('show',show);
+      }
+
+      function updateHUD(){
+        scoreLabel.textContent=st.score;
+        livesLabel.textContent=st.lives;
+        dotsLeftLabel.textContent=(st.dotsTotal - st.dotsEaten);
+        ghostModeLabel.textContent=st.ghostMode.charAt(0).toUpperCase()+st.ghostMode.slice(1);
+        timerLabel.textContent=Math.ceil(st.countdown);
+      }
+
+      // MAZE
+      function parseLayout(layout){
+        const s=new Set();
+        for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(layout[y][x]==='1') s.add(key(x,y));
+        return s;
+      }
+
+      function renderInitialWalls(){
+        mazeLayer.innerHTML='';
+        st.wallEls.clear();
+        for(const k of st.walls){
+          const [x,y]=k.split(',').map(Number);
+          const el=document.createElement('div');
+          el.className='wall';
+          el.style.left=`${x*26}px`; el.style.top=`${y*26}px`;
+          mazeLayer.appendChild(el);
+          st.wallEls.set(k,el);
+        }
+      }
+
+      function animateMazeTo(newWalls){
+        const all = new Set([...st.walls, ...newWalls]);
+
+        for(const k of all){
+          if(!st.wallEls.has(k)){
+            const [x,y]=k.split(',').map(Number);
+            const el=document.createElement('div');
+            el.className='wall';
+            el.style.left=`${x*26}px`; el.style.top=`${y*26}px`;
+            el.style.opacity='0';
+            mazeLayer.appendChild(el);
+            st.wallEls.set(k,el);
+          }
+        }
+
+        for(const [k,el] of st.wallEls){
+          const inOld=st.walls.has(k), inNew=newWalls.has(k);
+          if(inNew){
+            el.classList.add('refracting');
+            el.style.opacity='1';
+            if(!inOld){
+              el.style.transform='rotate(-13deg) scale(.76)';
+              requestAnimationFrame(()=>el.style.transform='rotate(0deg) scale(1)');
+            }else{
+              el.style.transform=`rotate(${(Math.random()*6-3).toFixed(2)}deg)`;
+              requestAnimationFrame(()=>el.style.transform='rotate(0deg)');
+            }
+          }else{
+            el.style.opacity='0';
+            el.style.transform='rotate(14deg) scale(.8)';
+          }
+        }
+
+        setTimeout(()=>{
+          for(const el of st.wallEls.values()) el.classList.remove('refracting');
+        },700);
+
+        setTimeout(()=>{
+          for(const [k,el] of st.wallEls){
+            if(!newWalls.has(k)){ el.remove(); st.wallEls.delete(k); }
+            else{ el.style.opacity='1'; el.style.transform='rotate(0deg) scale(1)'; }
+          }
+        },900);
+      }
+
+      function applyLayout(idx, initial=false){
+        const nw = parseLayout(layouts[idx]);
+        if(initial){
+          st.walls = nw;
+          renderInitialWalls();
+        }else{
+          animateMazeTo(nw);
+          st.walls = nw;
+        }
+      }
+
+      function buildDots(){
+        st.dots.clear();
+        st.dotEls.clear();
+        dotLayer.innerHTML='';
+
+        const spawns = new Set([
+          key(1,1), key(COLS-2,1), key(1,ROWS-2), key(COLS-2,ROWS-2), key(Math.floor(COLS/2), Math.floor(ROWS/2))
+        ]);
+
+        for(let y=1;y<ROWS-1;y++){
+          for(let x=0;x<COLS;x++){
+            if(!isWall(x,y) && !spawns.has(key(x,y))){
+              st.dots.add(key(x,y));
+              const el=document.createElement('div');
+              el.className='dot';
+              el.dataset.k=key(x,y);
+              el.style.left=`${x*26+13}px`;
+              el.style.top=`${y*26+13}px`;
+              dotLayer.appendChild(el);
+              st.dotEls.set(key(x,y),el);
+            }
+          }
+        }
+
+        st.dotsTotal=st.dots.size;
+        st.dotsEaten=0;
+        updateHUD();
+      }
+
+      // ENTITIES
+      function createPlayer(){
+        const el=document.createElement('div');
+        el.className='player';
+        entityLayer.appendChild(el);
+        return {
+          x:1, y:1,
+          dir:{x:0,y:0},
+          nextDir:{x:0,y:0},
+          moving:false,
+          t:0,
+          from:{x:1,y:1},
+          to:{x:1,y:1},
+          el
+        };
+      }
+
+      function createGhost(cls,x,y,mode){
+        const el=document.createElement('div');
+        el.className=`ghost ${cls} scatter`;
+        entityLayer.appendChild(el);
+        return {
+          x,y,
+          dir:{x:0,y:0},
+          mode, // personality
+          moving:false,
+          t:0,
+          from:{x,y},
+          to:{x,y},
+          step:GHOST_STEP,
+          el,
+          scatterTarget:getScatterTarget(cls),
+          home:{x,y}
+        };
+      }
+
+      function getScatterTarget(cls){
+        if(cls==='g1') return {x:COLS-2,y:1};
+        if(cls==='g2') return {x:1,y:1};
+        return {x:COLS-2,y:ROWS-2};
+      }
+
+      function placePlayerInstant(){
+        st.player.el.style.left=`${st.player.x*26+13}px`;
+        st.player.el.style.top =`${st.player.y*26+13}px`;
+        rotatePlayer();
+      }
+
+      function placeGhostInstant(g){
+        g.el.style.left=`${g.x*26+13}px`;
+        g.el.style.top =`${g.y*26+13}px`;
+      }
+
+      function rotatePlayer(){
+        const d=st.player.dir;
+        let r=0;
+        if(d.x===1) r=0;
+        else if(d.x===-1) r=180;
+        else if(d.y===1) r=90;
+        else if(d.y===-1) r=-90;
+        st.player.el.style.transform=`translate(-50%,-50%) rotate(${r}deg)`;
+      }
+
+      function setGhostVisualMode(){
+        for(const g of st.ghosts){
+          g.el.classList.toggle('scatter', st.ghostMode==='scatter');
+          g.el.classList.toggle('chase', st.ghostMode==='chase');
+        }
+      }
+
+      // INPUT
+      const keys=new Set();
+      window.addEventListener('keydown',e=>{
+        const k=e.key.toLowerCase();
+        if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k)) e.preventDefault();
+        if(k===' ') togglePause();
+        keys.add(k);
+      });
+      window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+
+      function readDir(){
+        if(keys.has('arrowup')||keys.has('w')) return {x:0,y:-1};
+        if(keys.has('arrowdown')||keys.has('s')) return {x:0,y:1};
+        if(keys.has('arrowleft')||keys.has('a')) return {x:-1,y:0};
+        if(keys.has('arrowright')||keys.has('d')) return {x:1,y:0};
+        return {x:st.player.nextDir.x,y:st.player.nextDir.y};
+      }
+
+      // TUNNEL WRAP
+      function wrapX(x){
+        if(x < 0) return COLS-1;
+        if(x > COLS-1) return 0;
+        return x;
+      }
+
+      function canStep(x,y,dir,phase=false){
+        let nx=x+dir.x, ny=y+dir.y;
+        nx = wrapX(nx);
+        if(!inside(nx,ny)) return false;
+        if(phase) return true;
+        return !isWall(nx,ny);
+      }
+
+      function startStep(e,dir){
+        e.moving=true; e.t=0;
+        e.from={x:e.x,y:e.y};
+        let tx=e.x+dir.x, ty=e.y+dir.y;
+        tx = wrapX(tx);
+        e.to={x:tx,y:ty};
+        e.dir={x:dir.x,y:dir.y};
+      }
+
+      // PLAYER UPDATE
+      function updatePlayer(dt){
+        const p=st.player;
+        p.nextDir=readDir();
+
+        if(!p.moving){
+          if((p.nextDir.x||p.nextDir.y) && canStep(p.x,p.y,p.nextDir,st.phase)){
+            startStep(p,p.nextDir); rotatePlayer();
+          } else if((p.dir.x||p.dir.y) && canStep(p.x,p.y,p.dir,st.phase)){
+            startStep(p,p.dir); rotatePlayer();
+          }
+        }
+
+        if(p.moving){
+          p.t += dt / PLAYER_STEP;
+          const t=Math.min(1,p.t);
+
+          // interpolación considerando túnel
+          let fx=p.from.x, tx=p.to.x;
+          if(Math.abs(tx-fx)>1){ // cruzando borde
+            if(tx===0 && fx===COLS-1) tx=COLS;
+            if(tx===COLS-1 && fx===0) fx=COLS;
+          }
+
+          let ix = fx + (tx-fx)*t;
+          let iy = p.from.y + (p.to.y-p.from.y)*t;
+
+          // wrap visual
+          if(ix>=COLS) ix-=COLS;
+          if(ix<0) ix+=COLS;
+
+          p.el.style.left=`${ix*26+13}px`;
+          p.el.style.top =`${iy*26+13}px`;
+
+          if(t>=1){
+            p.x=p.to.x; p.y=p.to.y;
+            p.moving=false;
+            placePlayerInstant();
+            eatDot(p.x,p.y);
+          }
+        }
+      }
+
+      // GHOST AI
+      function neighborDirs(x,y,phase=false){
+        const d=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+        return d.filter(dir=>canStep(x,y,dir,phase));
+      }
+
+      function chooseGhostDir(g){
+        const options = neighborDirs(g.x,g.y,false);
+        if(!options.length) return {x:0,y:0};
+
+        // no reversa salvo necesidad
+        const nonReverse = options.filter(d=>!(d.x===-g.dir.x && d.y===-g.dir.y));
+        const cands = nonReverse.length ? nonReverse : options;
+
+        let target={x:st.player.x,y:st.player.y};
+
+        if(st.ghostMode==='scatter'){
+          target = g.scatterTarget;
+        }else{
+          // chase
+          if(g.mode==='direct'){
+            target={x:st.player.x,y:st.player.y};
+          } else if(g.mode==='ambush'){
+            target={x:st.player.x + st.player.dir.x*3, y:st.player.y + st.player.dir.y*3};
+            target.x = Math.max(0, Math.min(COLS-1, target.x));
+            target.y = Math.max(0, Math.min(ROWS-1, target.y));
+          } else {
+            // patrol/chase blend
+            const d = dist(g.x,g.y,st.player.x,st.player.y);
+            if(d<5){
+              target={x:st.player.x,y:st.player.y};
+            }else{
+              target=g.scatterTarget;
+            }
+          }
+        }
+
+        cands.sort((a,b)=>{
+          const ax=wrapX(g.x+a.x), ay=g.y+a.y;
+          const bx=wrapX(g.x+b.x), by=g.y+b.y;
+          const da=dist(ax,ay,target.x,target.y);
+          const db=dist(bx,by,target.x,target.y);
+          return da-db;
+        });
+
+        return cands[0];
+      }
+
+      function updateGhost(g,dt){
+        if(!g.moving){
+          const d=chooseGhostDir(g);
+          if(d.x||d.y) startStep(g,d);
+        }
+
+        if(g.moving){
+          g.t += dt / g.step;
+          const t=Math.min(1,g.t);
+
+          let fx=g.from.x, tx=g.to.x;
+          if(Math.abs(tx-fx)>1){
+            if(tx===0 && fx===COLS-1) tx=COLS;
+            if(tx===COLS-1 && fx===0) fx=COLS;
+          }
+
+          let ix = fx + (tx-fx)*t;
+          let iy = g.from.y + (g.to.y-g.from.y)*t;
+          if(ix>=COLS) ix-=COLS;
+          if(ix<0) ix+=COLS;
+
+          g.el.style.left=`${ix*26+13}px`;
+          g.el.style.top =`${iy*26+13}px`;
+
+          if(t>=1){
+            g.x=g.to.x; g.y=g.to.y;
+            g.moving=false;
+            placeGhostInstant(g);
+          }
+        }
+      }
+
+      // DOTS / COLLISIONS
+      function eatDot(x,y){
+        const k=key(x,y);
+        if(st.dots.has(k)){
+          st.dots.delete(k);
+          st.dotsEaten++;
+          st.score += 10;
+          const el=st.dotEls.get(k);
+          if(el) el.classList.add('eaten');
+          sfx.dot();
+          updateHUD();
+
+          if(st.dotsEaten>=st.dotsTotal){
+            winLevel();
+          }
+        }
+      }
+
+      function checkHit(){
+        for(const g of st.ghosts){
+          if(g.x===st.player.x && g.y===st.player.y){
+            loseLife();
+            return;
+          }
+          if(g.moving && st.player.moving){
+            if(g.to.x===st.player.to.x && g.to.y===st.player.to.y){
+              loseLife();
+              return;
+            }
+          }
+        }
+      }
+
+      // SCATTER / CHASE CYCLE
+      function updateGhostModeCycle(dt){
+        st.ghostPhaseLeft -= dt;
+        if(st.ghostPhaseLeft<=0){
+          st.ghostPhaseIndex = Math.min(st.ghostPhaseIndex+1, GHOST_PHASES.length-1);
+          st.ghostMode = GHOST_PHASES[st.ghostPhaseIndex].mode;
+          st.ghostPhaseLeft = GHOST_PHASES[st.ghostPhaseIndex].t;
+          setGhostVisualMode();
+          updateHUD();
+        }
+      }
+
+      // REFRACTOR
+      function triggerRefract(){
+        if(st.over||st.won) return;
+        st.layoutIdx = (st.layoutIdx+1)%layouts.length;
+        const nextWalls=parseLayout(layouts[st.layoutIdx]);
+        animateMazeTo(nextWalls);
+        st.walls=nextWalls;
+
+        st.phase=true; st.phaseLeft=PHASE_DURATION;
+        phaseBadge.classList.add('on');
+        phaseOverlay.classList.remove('play'); void phaseOverlay.offsetWidth; phaseOverlay.classList.add('play');
+        sfx.phase();
+
+        setTimeout(()=>{
+          // reubicar entidades si quedaron sobre muro al cerrar fase
+          if(isWall(st.player.x,st.player.y)) relocateToNearestFree(st.player);
+          for(const g of st.ghosts){
+            if(isWall(g.x,g.y)) relocateToNearestFree(g);
+          }
+        }, 2050);
+      }
+
+      function relocateToNearestFree(e){
+        const q=[[e.x,e.y]];
+        const seen=new Set([key(e.x,e.y)]);
+        const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+        while(q.length){
+          const [x,y]=q.shift();
+          if(!isWall(x,y)){
+            e.x=x;e.y=y;e.moving=false;
+            if(e===st.player) placePlayerInstant(); else placeGhostInstant(e);
+            return;
+          }
+          for(const [dx,dy] of dirs){
+            const nx=wrapX(x+dx), ny=y+dy;
+            const k=key(nx,ny);
+            if(inside(nx,ny)&&!seen.has(k)){
+              seen.add(k); q.push([nx,ny]);
+            }
+          }
+        }
+      }
+
+      // LIFE SYSTEM
+      function loseLife(){
+        if(st.respawning || st.over || st.won) return;
+        st.lives--;
+        sfx.lifeLost();
+        updateHUD();
+
+        if(st.lives<=0){
+          gameOver();
+          return;
+        }
+
+        st.respawning=true;
+        st.running=false;
+        stateLabel.textContent='Reiniciando posición';
+        setMessage('Life Lost', true);
+
+        setTimeout(()=>{
+          resetPositionsOnly();
+          setMessage('', false);
+          stateLabel.textContent='Activo';
+          st.running=true;
+          st.respawning=false;
+        }, 1200);
+      }
+
+      function resetPositionsOnly(){
+        st.player.x=1; st.player.y=1; st.player.dir={x:0,y:0}; st.player.nextDir={x:0,y:0}; st.player.moving=false;
+        placePlayerInstant();
+
+        const ghostSpawns=[
+          {x:COLS-2,y:1},
+          {x:1,y:ROWS-2},
+          {x:COLS-2,y:ROWS-2}
+        ];
+        st.ghosts.forEach((g,i)=>{
+          g.x=ghostSpawns[i].x; g.y=ghostSpawns[i].y; g.dir={x:0,y:0}; g.moving=false;
+          placeGhostInstant(g);
+        });
+      }
+
+      function gameOver(){
+        st.over=true; st.running=false;
+        stateLabel.textContent='Game Over';
+        setMessage('Signal Lost', true);
+        sfx.hit();
+      }
+
+      function winLevel(){
+        st.won=true; st.running=false;
+        stateLabel.textContent='Nivel completado';
+        setMessage('Refractor Clear', true);
+        sfx.win();
+      }
+
+      function togglePause(){
+        if(st.over||st.won||st.respawning) return;
+        st.running=!st.running;
+        pauseBtn.textContent=st.running?'Pause':'Resume';
+        stateLabel.textContent=st.running?'Activo':'Pausado';
+      }
+
+      // RESET
+      function resetAll(){
+        st.running=true; st.over=false; st.won=false; st.respawning=false;
+        st.score=0; st.lives=START_LIVES;
+        st.countdown=MAP_INTERVAL;
+        st.phase=false; st.phaseLeft=0;
+        st.layoutIdx=0;
+
+        st.ghostMode='scatter';
+        st.ghostPhaseIndex=0;
+        st.ghostPhaseLeft=GHOST_PHASES[0].t;
+
+        stateLabel.textContent='Activo';
+        setMessage('', false);
+        phaseBadge.classList.remove('on');
+
+        applyLayout(0,true);
+        buildDots();
+
+        entityLayer.innerHTML='';
+        st.player=createPlayer();
+        st.ghosts=[
+          createGhost('g1', COLS-2,1,'direct'),
+          createGhost('g2', 1,ROWS-2,'ambush'),
+          createGhost('g3', COLS-2,ROWS-2,'patrol')
+        ];
+        placePlayerInstant();
+        st.ghosts.forEach(placeGhostInstant);
+        setGhostVisualMode();
+
+        updateHUD();
+      }
+
+      // LOOP
+      function loop(now){
+        const dt=Math.min(0.05,(now-st.last)/1000);
+        st.last=now;
+
+        if(st.running && !st.over && !st.won){
+          // timer map
+          st.countdown-=dt;
+          if(st.countdown<=0){
+            st.countdown=MAP_INTERVAL;
+            triggerRefract();
+          }
+
+          // phase window
+          if(st.phase){
+            st.phaseLeft-=dt;
+            if(st.phaseLeft<=0){
+              st.phase=false;
+              phaseBadge.classList.remove('on');
+            }
+          }
+
+          // ghost mode cycle
+          updateGhostModeCycle(dt);
+
+          // player + ghosts
+          updatePlayer(dt);
+          for(const g of st.ghosts) updateGhost(g,dt);
+
+          checkHit();
+          updateHUD();
+        }
+
+        requestAnimationFrame(loop);
+      }
+
+      // UI
+      soundBtn.addEventListener('click', ()=>{
+        soundOn=!soundOn;
+        soundBtn.textContent=`Sound: ${soundOn?'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', resetAll);
+
+      // Boot
+      resetAll();
+      st.last=performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

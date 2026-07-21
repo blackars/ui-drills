@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kinetic Typography Boss Fight — Minimal B/N</title>
+  <style>
+    :root{
+      --bg:#000;
+      --fg:#fff;
+      --g1:#121212;
+      --g2:#222;
+      --g3:#666;
+      --accent:#ddd;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0; width:100%; height:100%; overflow:hidden;
+      background:var(--bg); color:var(--fg);
+      font-family:"Inter Tight","Roboto Condensed","Arial Narrow",Arial,sans-serif;
+      letter-spacing:.02em;
+    }
+    canvas{display:block; width:100vw; height:100vh;}
+    .hud{
+      position:fixed; inset:0; pointer-events:none;
+      display:flex; flex-direction:column; justify-content:space-between;
+      padding:18px 20px;
+    }
+    .top,.bottom{display:flex; justify-content:space-between; align-items:center;}
+    .panel{
+      border:1px solid var(--g2);
+      padding:8px 10px;
+      background:rgba(0,0,0,.35);
+      backdrop-filter: blur(2px);
+      font-size:12px; line-height:1.1;
+      text-transform:uppercase;
+    }
+    .title{
+      font-size:11px; color:#999; margin-bottom:6px;
+      letter-spacing:.14em;
+    }
+    .value{font-size:14px; color:#fff; letter-spacing:.08em;}
+    .bar{
+      width:220px; height:8px; border:1px solid var(--g2); margin-top:8px; position:relative;
+      background:#050505;
+    }
+    .bar > i{
+      position:absolute; left:0; top:0; bottom:0;
+      width:100%; background:linear-gradient(90deg,#ddd,#aaa);
+      transition:width .18s ease;
+    }
+    .centerHint{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      font-size:12px; color:#9a9a9a; text-transform:uppercase;
+      letter-spacing:.14em; pointer-events:none; opacity:.9;
+      border:1px solid #1d1d1d; padding:10px 14px; background:rgba(0,0,0,.45);
+      transition:opacity .35s ease;
+    }
+    .centerHint.hide{opacity:0}
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div class="hud">
+  <div class="top">
+    <div class="panel">
+      <div class="title">Boss</div>
+      <div class="value" id="bossName">NOISE</div>
+      <div class="bar"><i id="bossHpBar"></i></div>
+    </div>
+    <div class="panel">
+      <div class="title">Phase</div>
+      <div class="value" id="phaseText">I</div>
+    </div>
+  </div>
+  <div class="bottom">
+    <div class="panel">
+      <div class="title">Score</div>
+      <div class="value" id="scoreText">000000</div>
+    </div>
+    <div class="panel">
+      <div class="title">Player</div>
+      <div class="value" id="hpText">HP 100</div>
+    </div>
+  </div>
+</div>
+
+<div class="centerHint" id="hint">
+  Move: WASD / Arrows · Shoot: Click / Space · Dash: Shift
+</div>
+
+<script>
+(() => {
+  // ========= Canvas =========
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  function resize(){
+    canvas.width = Math.floor(innerWidth * devicePixelRatio);
+    canvas.height = Math.floor(innerHeight * devicePixelRatio);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // ========= HUD =========
+  const hpBar = document.getElementById('bossHpBar');
+  const phaseText = document.getElementById('phaseText');
+  const scoreText = document.getElementById('scoreText');
+  const hpText = document.getElementById('hpText');
+  const hint = document.getElementById('hint');
+  setTimeout(() => hint.classList.add('hide'), 2600);
+
+  // ========= Helpers =========
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const rand = (a,b)=>a + Math.random()*(b-a);
+  const dist2 = (ax,ay,bx,by)=> {
+    const dx=ax-bx, dy=ay-by;
+    return dx*dx+dy*dy;
+  }
+
+  // ========= Input =========
+  const keys = new Set();
+  let mouse = {x:innerWidth/2, y:innerHeight/2, down:false};
+  addEventListener('keydown',e=>{
+    keys.add(e.code);
+    if(e.code==='Space') e.preventDefault();
+  });
+  addEventListener('keyup',e=>keys.delete(e.code));
+  addEventListener('mousemove',e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+  addEventListener('mousedown',()=>mouse.down=true);
+  addEventListener('mouseup',()=>mouse.down=false);
+
+  // ========= Entities =========
+  const player = {
+    x: innerWidth*0.5,
+    y: innerHeight*0.78,
+    vx:0, vy:0,
+    r:9,
+    hp:100,
+    fireCooldown:0,
+    dashCd:0,
+    inv:0
+  };
+
+  const bullets = [];
+  const enemyBullets = [];
+  const particles = [];
+
+  const boss = {
+    word: "NOISE",
+    x: innerWidth*0.5,
+    y: innerHeight*0.34,
+    hpMax: 420,
+    hp: 420,
+    phase: 1,
+    t:0,
+    shootTimer:0,
+    rings: [
+      {radius:70, speed: 0.6, count:8},
+      {radius:118,speed:-0.38,count:12},
+      {radius:168,speed: 0.24,count:16},
+    ],
+    letterNodes: [],
+  };
+
+  let score = 0;
+  let gameOver = false;
+  let victory = false;
+
+  function rebuildLetters(){
+    boss.letterNodes = [];
+    for(let r=0;r<boss.rings.length;r++){
+      const ring = boss.rings[r];
+      for(let i=0;i<ring.count;i++){
+        boss.letterNodes.push({
+          ring:r,
+          i,
+          hp: (r===0?2:1),
+          alive:true,
+          chr: boss.word[(i+r)%boss.word.length],
+          jitter: rand(0,Math.PI*2)
+        });
+      }
+    }
+  }
+  rebuildLetters();
+
+  function spawnParticle(x,y,vx,vy,life,size,col='#bbb'){
+    particles.push({x,y,vx,vy,life,max:life,size,col});
+  }
+
+  function shootFromPlayer(){
+    const angle = Math.atan2(mouse.y-player.y, mouse.x-player.x);
+    const speed = 9.5;
+    bullets.push({
+      x:player.x, y:player.y,
+      vx:Math.cos(angle)*speed,
+      vy:Math.sin(angle)*speed,
+      r:2.5, life:80
+    });
+    for(let i=0;i<4;i++){
+      spawnParticle(
+        player.x, player.y,
+        Math.cos(angle+rand(-0.4,0.4))*rand(0.6,2.4),
+        Math.sin(angle+rand(-0.4,0.4))*rand(0.6,2.4),
+        rand(16,28), rand(0.8,1.8), '#777'
+      );
+    }
+  }
+
+  function bossShootPattern(){
+    const p = boss.phase;
+    const cx = boss.x, cy = boss.y;
+    const shots = p===1 ? 8 : p===2 ? 13 : 18;
+    const spd = p===1 ? 2.2 : p===2 ? 2.8 : 3.4;
+    const base = boss.t * (p===3 ? 0.07 : 0.04);
+
+    for(let i=0;i<shots;i++){
+      const a = base + (Math.PI*2)*(i/shots);
+      enemyBullets.push({
+        x:cx + Math.cos(a)*28,
+        y:cy + Math.sin(a)*28,
+        vx:Math.cos(a)*spd,
+        vy:Math.sin(a)*spd,
+        r:3 + (p===3?0.9:0),
+        life:220,
+        chr: boss.word[i%boss.word.length]
+      });
+    }
+
+    // Syllable burst
+    if(p>=2){
+      const chunks = p===2 ? ["NO","ISE"] : ["N","OI","SE"];
+      for(let i=0;i<chunks.length;i++){
+        const a = rand(0,Math.PI*2);
+        const s = rand(2.1,3.2);
+        enemyBullets.push({
+          x:cx, y:cy,
+          vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+          r:8, life:140, chr:chunks[i], big:true
+        });
+      }
+    }
+  }
+
+  function applyPhases(){
+    const ratio = boss.hp / boss.hpMax;
+    let np = 1;
+    if(ratio < 0.66) np = 2;
+    if(ratio < 0.33) np = 3;
+    if(np !== boss.phase){
+      boss.phase = np;
+      phaseText.textContent = np===1?"I":np===2?"II":"III";
+      // refine composition by phase
+      if(np===2){
+        boss.rings[0].speed = -0.95;
+        boss.rings[1].speed = 0.52;
+      }
+      if(np===3){
+        boss.rings[0].radius = 58;
+        boss.rings[1].radius = 108;
+        boss.rings[2].radius = 190;
+        boss.rings[2].speed = -0.44;
+      }
+      for(let i=0;i<22;i++){
+        spawnParticle(boss.x,boss.y,rand(-2.8,2.8),rand(-2.8,2.8),rand(18,40),rand(1,2.4),'#fff');
+      }
+    }
+  }
+
+  // ========= Update =========
+  function update(){
+    if(gameOver || victory) return;
+
+    boss.t += 1;
+    applyPhases();
+
+    // Player move
+    const accel = 0.52;
+    const maxSp = 4.2;
+    const up = keys.has('KeyW') || keys.has('ArrowUp');
+    const dn = keys.has('KeyS') || keys.has('ArrowDown');
+    const lf = keys.has('KeyA') || keys.has('ArrowLeft');
+    const rt = keys.has('KeyD') || keys.has('ArrowRight');
+
+    if(up) player.vy -= accel;
+    if(dn) player.vy += accel;
+    if(lf) player.vx -= accel;
+    if(rt) player.vx += accel;
+
+    // Dash
+    if((keys.has('ShiftLeft')||keys.has('ShiftRight')) && player.dashCd<=0){
+      const dx = mouse.x - player.x, dy = mouse.y - player.y;
+      const m = Math.hypot(dx,dy)||1;
+      player.vx += (dx/m)*7.8;
+      player.vy += (dy/m)*7.8;
+      player.dashCd = 70;
+      player.inv = 16;
+      for(let i=0;i<18;i++) spawnParticle(player.x,player.y,rand(-3,3),rand(-3,3),rand(10,24),rand(1,2),'#999');
+    }
+
+    player.vx *= 0.88;
+    player.vy *= 0.88;
+    const sp = Math.hypot(player.vx,player.vy);
+    if(sp>maxSp){
+      player.vx = player.vx/sp*maxSp;
+      player.vy = player.vy/sp*maxSp;
+    }
+
+    player.x += player.vx;
+    player.y += player.vy;
+    player.x = clamp(player.x, 18, innerWidth-18);
+    player.y = clamp(player.y, 18, innerHeight-18);
+
+    if(player.fireCooldown>0) player.fireCooldown--;
+    if(player.dashCd>0) player.dashCd--;
+    if(player.inv>0) player.inv--;
+
+    const firing = mouse.down || keys.has('Space');
+    if(firing && player.fireCooldown<=0){
+      shootFromPlayer();
+      player.fireCooldown = 6;
+    }
+
+    // Boss attack timer
+    boss.shootTimer--;
+    if(boss.shootTimer<=0){
+      bossShootPattern();
+      boss.shootTimer = boss.phase===1 ? 90 : boss.phase===2 ? 64 : 46;
+    }
+
+    // Update bullets
+    for(let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      b.x += b.vx; b.y += b.vy; b.life--;
+      if(b.life<=0 || b.x<0 || b.x>innerWidth || b.y<0 || b.y>innerHeight){
+        bullets.splice(i,1); continue;
+      }
+
+      // hit letters
+      let hit = false;
+      for(const ln of boss.letterNodes){
+        if(!ln.alive) continue;
+        const ring = boss.rings[ln.ring];
+        let a = (Math.PI*2)*(ln.i/ring.count) + boss.t*0.01*ring.speed + ln.jitter*0.01;
+        if(boss.phase>=2) a += Math.sin(boss.t*0.03 + ln.jitter)*0.04;
+        const lx = boss.x + Math.cos(a)*ring.radius;
+        const ly = boss.y + Math.sin(a)*ring.radius;
+        if(dist2(b.x,b.y,lx,ly) < (12*12)){
+          ln.hp--;
+          hit = true;
+          for(let p=0;p<5;p++) spawnParticle(lx,ly,rand(-1.8,1.8),rand(-1.8,1.8),rand(10,22),rand(0.8,1.6),'#aaa');
+          if(ln.hp<=0){
+            ln.alive = false;
+            boss.hp = Math.max(0,boss.hp-4);
+            score += 120;
+          }else{
+            boss.hp = Math.max(0,boss.hp-1.5);
+            score += 30;
+          }
+          break;
+        }
+      }
+
+      // core hit (small bonus)
+      if(!hit && dist2(b.x,b.y,boss.x,boss.y) < (26*26)){
+        boss.hp = Math.max(0,boss.hp-0.6);
+        score += 8;
+        hit = true;
+        for(let p=0;p<2;p++) spawnParticle(b.x,b.y,rand(-1,1),rand(-1,1),rand(8,14),1,'#666');
+      }
+
+      if(hit) bullets.splice(i,1);
+    }
+
+    for(let i=enemyBullets.length-1;i>=0;i--){
+      const e = enemyBullets[i];
+      e.x += e.vx; e.y += e.vy; e.life--;
+      if(e.life<=0 || e.x<-40 || e.x>innerWidth+40 || e.y<-40 || e.y>innerHeight+40){
+        enemyBullets.splice(i,1); continue;
+      }
+      if(player.inv<=0 && dist2(e.x,e.y,player.x,player.y) < ((e.r+player.r+2)**2)){
+        enemyBullets.splice(i,1);
+        player.hp -= e.big ? 12 : 7;
+        player.inv = 18;
+        for(let p=0;p<16;p++) spawnParticle(player.x,player.y,rand(-2.4,2.4),rand(-2.4,2.4),rand(12,24),rand(1,2),'#ccc');
+        if(player.hp<=0){
+          player.hp = 0;
+          gameOver = true;
+        }
+      }
+    }
+
+    // Re-seed letters when mostly destroyed (phase flavor)
+    const aliveCount = boss.letterNodes.filter(n=>n.alive).length;
+    if(aliveCount < 8 && boss.hp > 20){
+      // Fragment refill
+      for(const n of boss.letterNodes){
+        if(Math.random()<0.65){
+          n.alive = true;
+          n.hp = boss.phase===3 ? 1 : (n.ring===0?2:1);
+          n.chr = boss.word[Math.floor(Math.random()*boss.word.length)];
+        }
+      }
+      boss.hp = Math.max(0,boss.hp-12);
+    }
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= .98; p.vy *= .98;
+      p.life--;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    if(boss.hp<=0){
+      victory = true;
+      for(let i=0;i<160;i++) spawnParticle(boss.x,boss.y,rand(-4,4),rand(-4,4),rand(20,80),rand(1,2.8), i%2?'#fff':'#888');
+    }
+
+    // HUD
+    hpBar.style.width = (boss.hp/boss.hpMax*100).toFixed(1) + '%';
+    scoreText.textContent = String(score).padStart(6,'0');
+    hpText.textContent = `HP ${Math.max(0,player.hp)}`;
+  }
+
+  // ========= Draw =========
+  function drawBackgroundGrid(){
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+
+    ctx.strokeStyle = '#0f0f0f';
+    ctx.lineWidth = 1;
+    const gap = 36;
+    ctx.beginPath();
+    for(let x=0;x<innerWidth;x+=gap){ ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,innerHeight); }
+    for(let y=0;y<innerHeight;y+=gap){ ctx.moveTo(0,y+.5); ctx.lineTo(innerWidth,y+.5); }
+    ctx.stroke();
+
+    // vignette
+    const g = ctx.createRadialGradient(innerWidth*.5,innerHeight*.45,80,innerWidth*.5,innerHeight*.5,Math.max(innerWidth,innerHeight)*.7);
+    g.addColorStop(0,'rgba(0,0,0,0)');
+    g.addColorStop(1,'rgba(0,0,0,.55)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+  }
+
+  function drawBoss(){
+    // core
+    ctx.beginPath();
+    ctx.arc(boss.x,boss.y,24,0,Math.PI*2);
+    ctx.strokeStyle='#4d4d4d';
+    ctx.lineWidth=1;
+    ctx.stroke();
+
+    ctx.fillStyle='#d9d9d9';
+    ctx.font='700 24px "Inter Tight","Arial Narrow",sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(boss.word,boss.x,boss.y+1);
+
+    // rings + letters
+    for(let r=0;r<boss.rings.length;r++){
+      const ring = boss.rings[r];
+      ctx.beginPath();
+      ctx.arc(boss.x,boss.y,ring.radius,0,Math.PI*2);
+      ctx.strokeStyle = r===0?'#2a2a2a':'#1a1a1a';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    for(const ln of boss.letterNodes){
+      if(!ln.alive) continue;
+      const ring = boss.rings[ln.ring];
+      let a = (Math.PI*2)*(ln.i/ring.count) + boss.t*0.01*ring.speed + ln.jitter*0.01;
+      if(boss.phase>=2) a += Math.sin(boss.t*0.03 + ln.jitter)*0.04;
+      if(boss.phase===3) a += Math.sin(boss.t*0.07 + ln.i)*0.06;
+
+      const x = boss.x + Math.cos(a)*ring.radius;
+      const y = boss.y + Math.sin(a)*ring.radius;
+
+      ctx.fillStyle = ln.ring===0 ? '#fff' : '#b6b6b6';
+      ctx.font = (ln.ring===0?'700 ':'500 ') + (ln.ring===0?18:14) + 'px "Inter Tight","Arial Narrow",sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(ln.chr, x, y);
+    }
+  }
+
+  function drawPlayer(){
+    ctx.save();
+    if(player.inv>0 && (player.inv%4<2)) ctx.globalAlpha = 0.35;
+
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,player.r+7,0,Math.PI*2);
+    ctx.strokeStyle='#2b2b2b'; ctx.lineWidth=1; ctx.stroke();
+
+    // aim line
+    ctx.beginPath();
+    ctx.moveTo(player.x,player.y);
+    ctx.lineTo(player.x + (mouse.x-player.x)*0.15, player.y + (mouse.y-player.y)*0.15);
+    ctx.strokeStyle='#555'; ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawBullets(){
+    for(const b of bullets){
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+      ctx.fillStyle='#f5f5f5';
+      ctx.fill();
+    }
+
+    for(const e of enemyBullets){
+      if(e.big){
+        ctx.strokeStyle='#cfcfcf';
+        ctx.strokeRect(e.x-10,e.y-8,20,16);
+        ctx.fillStyle='#e2e2e2';
+        ctx.font='700 10px "Inter Tight",sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(e.chr,e.x,e.y+0.5);
+      }else{
+        ctx.beginPath();
+        ctx.arc(e.x,e.y,e.r,0,Math.PI*2);
+        ctx.fillStyle='#9e9e9e';
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawParticles(){
+    for(const p of particles){
+      const a = p.life/p.max;
+      ctx.globalAlpha = a*0.8;
+      ctx.fillStyle = p.col;
+      ctx.fillRect(p.x,p.y,p.size,p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawEndText(){
+    if(!gameOver && !victory) return;
+    ctx.fillStyle='rgba(0,0,0,.6)';
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';
+    ctx.font='700 44px "Inter Tight","Arial Narrow",sans-serif';
+    ctx.fillText(victory ? 'BOSS DEFEATED' : 'SYSTEM DOWN', innerWidth/2, innerHeight/2 - 18);
+
+    ctx.fillStyle='#9a9a9a';
+    ctx.font='500 13px "Inter Tight",sans-serif';
+    ctx.fillText('Press R to restart', innerWidth/2, innerHeight/2 + 24);
+  }
+
+  addEventListener('keydown',(e)=>{
+    if(e.code==='KeyR' && (gameOver||victory)) location.reload();
+  });
+
+  function loop(){
+    update();
+    drawBackgroundGrid();
+    drawBoss();
+    drawBullets();
+    drawPlayer();
+    drawParticles();
+    drawEndText();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+</body>
+</html>

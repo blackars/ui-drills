@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Gravity Dots — Microgame</title>
+  <style>
+    :root{
+      --bg:#050505;
+      --bg2:#0b0b0b;
+      --white:#f3f3f3;
+      --gray:#9c9c9c;
+      --dark:#1b1b1b;
+      --danger:#2a2a2a;
+      --accent:#d9d9d9;
+    }
+    html,body{
+      margin:0; width:100%; height:100%;
+      background: radial-gradient(circle at 50% 40%, #0c0c0c 0%, #050505 45%, #020202 100%);
+      overflow:hidden; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--white);
+      -webkit-tap-highlight-color: transparent;
+      touch-action:none;
+    }
+    canvas{ display:block; width:100vw; height:100vh; }
+    .hud{
+      position:fixed; inset:0; pointer-events:none;
+      display:flex; flex-direction:column; justify-content:space-between;
+      padding:18px 16px;
+      mix-blend-mode:screen;
+    }
+    .top{
+      display:flex; justify-content:space-between; align-items:flex-start;
+      font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#d0d0d0;
+    }
+    .score{font-size:18px; letter-spacing:.06em; color:#f5f5f5;}
+    .timer{font-size:14px; color:#bdbdbd;}
+    .combo{
+      text-align:center; font-size:12px; letter-spacing:.16em; color:#c8c8c8;
+      opacity:.85;
+    }
+    .centerMsg{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      text-align:center; pointer-events:none;
+      color:#e8e8e8;
+      text-shadow:0 0 14px rgba(255,255,255,.08);
+    }
+    .centerMsg h1{
+      margin:0 0 10px; font-size:22px; letter-spacing:.22em; text-transform:uppercase;
+      font-weight:600;
+    }
+    .centerMsg p{
+      margin:4px 0; font-size:11px; letter-spacing:.13em; color:#b8b8b8; text-transform:uppercase;
+    }
+    .hint{
+      position:fixed; bottom:12px; left:50%; transform:translateX(-50%);
+      font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:#8f8f8f;
+      pointer-events:none;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud">
+  <div class="top">
+    <div>
+      <div style="opacity:.65">gravity dots</div>
+      <div class="score" id="score">0000</div>
+    </div>
+    <div style="text-align:right">
+      <div style="opacity:.65">time</div>
+      <div class="timer" id="time">60.0</div>
+    </div>
+  </div>
+  <div class="combo" id="combo">combo x1</div>
+</div>
+
+<div class="centerMsg" id="startMsg">
+  <h1>Gravity Dots</h1>
+  <p>Mueve el núcleo con mouse/touch</p>
+  <p>Click / Tap = invertir gravedad</p>
+  <p>Captura partículas claras, evita oscuras</p>
+  <p style="margin-top:10px; color:#f2f2f2;">Pulsa para empezar</p>
+</div>
+<div class="centerMsg" id="endMsg" style="display:none;">
+  <h1>Fin de ciclo</h1>
+  <p id="finalScore">Score 0</p>
+  <p id="finalCombo">Mejor combo x1</p>
+  <p style="margin-top:10px; color:#f2f2f2;">Pulsa para reiniciar</p>
+</div>
+<div class="hint">hiperminimal / 45–60s arcade loop</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const comboEl = document.getElementById('combo');
+  const startMsg = document.getElementById('startMsg');
+  const endMsg = document.getElementById('endMsg');
+  const finalScoreEl = document.getElementById('finalScore');
+  const finalComboEl = document.getElementById('finalCombo');
+
+  let W=0,H=0,DPR=1,diag=1;
+  function resize(){
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W*DPR); canvas.height = Math.floor(H*DPR);
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    diag = Math.hypot(W,H);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  const state = {
+    running:false, ended:false,
+    duration:60,
+    timeLeft:60,
+    score:0,
+    combo:1,
+    comboTimer:0,
+    bestCombo:1,
+    gravitySign:1, // 1 attract, -1 repel
+    target:{x:W*.5,y:H*.5},
+    core:{x:W*.5,y:H*.5,r:11},
+    pulse:0,
+    shake:0,
+    stars:[]
+  };
+
+  // fondo partículas sutiles
+  function initStars(){
+    state.stars = [];
+    const n = Math.floor((W*H)/18000);
+    for(let i=0;i<n;i++){
+      state.stars.push({
+        x:Math.random()*W, y:Math.random()*H,
+        a:Math.random()*0.35+0.05,
+        s:Math.random()*0.7+0.2
+      });
+    }
+  }
+  initStars();
+  window.addEventListener('resize', initStars);
+
+  const particles = [];
+  const ORBIT_BAND_MIN = 55;
+  const ORBIT_BAND_MAX = 125;
+
+  function rand(min,max){return Math.random()*(max-min)+min}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+  function lerp(a,b,t){return a+(b-a)*t}
+
+  function spawnParticle(type){
+    const edge = Math.floor(Math.random()*4);
+    let x,y;
+    if(edge===0){x=rand(0,W); y=-20}
+    else if(edge===1){x=W+20; y=rand(0,H)}
+    else if(edge===2){x=rand(0,W); y=H+20}
+    else {x=-20; y=rand(0,H)}
+    const toC = Math.atan2(state.core.y-y, state.core.x-x);
+    const speed = rand(20,60);
+    particles.push({
+      x,y,
+      vx:Math.cos(toC)*speed + rand(-18,18),
+      vy:Math.sin(toC)*speed + rand(-18,18),
+      r:type==='light'?rand(3.2,5.3):rand(4.2,6.2),
+      type, // light / dark
+      life:0,
+      orbitTime:0,
+      dead:false
+    });
+  }
+
+  function resetGame(){
+    particles.length=0;
+    state.timeLeft = state.duration;
+    state.score=0;
+    state.combo=1;
+    state.bestCombo=1;
+    state.comboTimer=0;
+    state.gravitySign=1;
+    state.pulse=0;
+    state.shake=0;
+    state.core.x = W*.5; state.core.y=H*.5;
+    state.target.x = state.core.x; state.target.y=state.core.y;
+    for(let i=0;i<16;i++) spawnParticle(i%3===0?'dark':'light');
+    updateHUD();
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = String(Math.floor(state.score)).padStart(4,'0');
+    timeEl.textContent = state.timeLeft.toFixed(1);
+    comboEl.textContent = `combo x${state.combo}`;
+  }
+
+  function start(){
+    resetGame();
+    state.running=true; state.ended=false;
+    startMsg.style.display='none';
+    endMsg.style.display='none';
+  }
+  function endGame(){
+    state.running=false; state.ended=true;
+    finalScoreEl.textContent = `Score ${Math.floor(state.score)}`;
+    finalComboEl.textContent = `Mejor combo x${state.bestCombo}`;
+    endMsg.style.display='block';
+  }
+
+  function flipGravity(){
+    if(!state.running) return;
+    state.gravitySign *= -1;
+    state.pulse = 1;
+  }
+
+  // input
+  function setPointer(x,y){
+    state.target.x = x; state.target.y = y;
+  }
+  window.addEventListener('mousemove', e=> setPointer(e.clientX,e.clientY));
+  window.addEventListener('touchmove', e=>{
+    if(e.touches[0]) setPointer(e.touches[0].clientX, e.touches[0].clientY);
+  }, {passive:false});
+
+  function primaryAction(){
+    if(!state.running){
+      start(); return;
+    }
+    flipGravity();
+  }
+  window.addEventListener('mousedown', primaryAction);
+  window.addEventListener('touchstart', (e)=>{ e.preventDefault(); primaryAction(); }, {passive:false});
+
+  // danger zones (anillos oscuros dinámicos)
+  function dangerAt(x,y,t){
+    const cx = W*0.5 + Math.sin(t*0.4)*W*0.12;
+    const cy = H*0.5 + Math.cos(t*0.33)*H*0.1;
+    const d = Math.hypot(x-cx, y-cy);
+    const ring = 180 + Math.sin(t*0.8)*36;
+    return Math.abs(d-ring) < 16;
+  }
+
+  let last = performance.now();
+  function loop(now){
+    const dt = Math.min(0.033, (now-last)/1000); last = now;
+    requestAnimationFrame(loop);
+
+    // suavizado núcleo
+    state.core.x = lerp(state.core.x, state.target.x, 0.17);
+    state.core.y = lerp(state.core.y, state.target.y, 0.17);
+    state.core.x = clamp(state.core.x, 12, W-12);
+    state.core.y = clamp(state.core.y, 12, H-12);
+
+    if(state.running){
+      state.timeLeft -= dt;
+      if(state.timeLeft<=0){ state.timeLeft=0; endGame(); }
+      state.comboTimer -= dt;
+      if(state.comboTimer<=0){ state.combo = 1; }
+
+      // spawn progresivo
+      if(Math.random() < dt*(6 + (60-state.timeLeft)*0.09)){
+        spawnParticle(Math.random()<0.68 ? 'light' : 'dark');
+      }
+
+      // actualizar partículas
+      for(const p of particles){
+        if(p.dead) continue;
+        p.life += dt;
+        const dx = state.core.x - p.x;
+        const dy = state.core.y - p.y;
+        const d2 = dx*dx + dy*dy + 0.001;
+        const d = Math.sqrt(d2);
+
+        // gravedad invertible
+        const G = (state.gravitySign===1 ? 2400 : -2100);
+        const ax = (dx/d) * (G/d2);
+        const ay = (dy/d) * (G/d2);
+
+        // ligera torsión orbital
+        const tx = -dy/d, ty = dx/d;
+        const swirl = 22/(d+30);
+        p.vx += (ax + tx*swirl)*dt;
+        p.vy += (ay + ty*swirl)*dt;
+        p.vx *= 0.995; p.vy *= 0.995;
+        p.x += p.vx*dt*60;
+        p.y += p.vy*dt*60;
+
+        // tiempo en órbita estable
+        if(d>ORBIT_BAND_MIN && d<ORBIT_BAND_MAX && Math.abs((p.vx*dx+p.vy*dy)/(d+1))<18){
+          p.orbitTime += dt;
+          if(p.orbitTime>0.75){
+            state.comboTimer = 1.2;
+            state.combo = Math.min(9, state.combo+1);
+            state.bestCombo = Math.max(state.bestCombo, state.combo);
+            p.orbitTime = 0;
+          }
+        } else {
+          p.orbitTime = Math.max(0, p.orbitTime - dt*0.8);
+        }
+
+        // captura / colisión
+        if(d < state.core.r + p.r + 1.5){
+          if(p.type==='light'){
+            state.score += 12 * state.combo;
+            state.comboTimer = 1.5;
+            state.pulse = 1;
+          }else{
+            state.score = Math.max(0, state.score - 22);
+            state.combo = 1;
+            state.shake = 1;
+          }
+          p.dead = true;
+          continue;
+        }
+
+        // zonas peligrosas (si toca el núcleo)
+        if(dangerAt(state.core.x,state.core.y,now*0.001)){
+          state.score = Math.max(0, state.score - 30*dt);
+          state.combo = 1;
+        }
+
+        // cleanup
+        if(p.x < -80 || p.x > W+80 || p.y < -80 || p.y > H+80) p.dead = true;
+      }
+
+      // limpieza y mínimo de partículas
+      for(let i=particles.length-1;i>=0;i--) if(particles[i].dead) particles.splice(i,1);
+      while(particles.length<10) spawnParticle(Math.random()<0.66?'light':'dark');
+
+      state.pulse = Math.max(0, state.pulse - dt*2.2);
+      state.shake = Math.max(0, state.shake - dt*3.1);
+      updateHUD();
+    }
+
+    // draw
+    const shakeX = (Math.random()-0.5)*6*state.shake;
+    const shakeY = (Math.random()-0.5)*6*state.shake;
+    ctx.setTransform(DPR,0,0,DPR,shakeX,shakeY);
+
+    ctx.clearRect(-20,-20,W+40,H+40);
+    // viñeta
+    const g = ctx.createRadialGradient(W*0.5,H*0.5,20,W*0.5,H*0.5,diag*0.55);
+    g.addColorStop(0,'rgba(15,15,15,0.12)');
+    g.addColorStop(1,'rgba(0,0,0,0.6)');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+    // estrellas
+    for(const s of state.stars){
+      ctx.fillStyle = `rgba(230,230,230,${s.a})`;
+      ctx.fillRect(s.x,s.y,s.s,s.s);
+    }
+
+    // anillo peligro
+    const t = now*0.001;
+    const cx = W*0.5 + Math.sin(t*0.4)*W*0.12;
+    const cy = H*0.5 + Math.cos(t*0.33)*H*0.1;
+    const rr = 180 + Math.sin(t*0.8)*36;
+    ctx.strokeStyle = 'rgba(55,55,55,0.38)';
+    ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.arc(cx,cy,rr,0,Math.PI*2); ctx.stroke();
+
+    // partículas
+    for(const p of particles){
+      const glow = p.type==='light' ? 0.22 : 0.12;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*2.8,0,Math.PI*2);
+      ctx.fillStyle = p.type==='light' ? `rgba(255,255,255,${glow})` : `rgba(80,80,80,${glow})`;
+      ctx.fill();
+
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle = p.type==='light' ? '#f1f1f1' : '#3b3b3b';
+      ctx.fill();
+    }
+
+    // núcleo
+    const pr = state.core.r + state.pulse*8;
+    ctx.beginPath(); ctx.arc(state.core.x,state.core.y,pr*2.8,0,Math.PI*2);
+    ctx.fillStyle = `rgba(235,235,235,${0.08 + state.pulse*0.16})`;
+    ctx.fill();
+
+    ctx.beginPath(); ctx.arc(state.core.x,state.core.y,state.core.r,0,Math.PI*2);
+    ctx.fillStyle = state.gravitySign===1 ? '#ffffff' : '#bcbcbc';
+    ctx.fill();
+
+    // indicador gravedad
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const r = 20 + state.pulse*6;
+    ctx.arc(state.core.x,state.core.y,r,0,Math.PI*2);
+    ctx.stroke();
+    ctx.fillStyle='rgba(240,240,240,0.75)';
+    ctx.font='10px Inter, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(state.gravitySign===1?'+':'−', state.core.x, state.core.y+3);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

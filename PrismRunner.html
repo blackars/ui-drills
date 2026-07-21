@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prism Runner // Fixed</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.14);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.8vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,38px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{min-height:0;display:grid;place-items:center;position:relative}
+    canvas{
+      width:min(96vw,1200px);
+      height:min(72vh,760px);
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      image-rendering:high-quality;
+    }
+
+    .overlay{
+      position:absolute;
+      width:min(96vw,1200px);
+      height:min(72vh,760px);
+      pointer-events:none;
+    }
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,22px);letter-spacing:.2em;text-transform:uppercase;
+      opacity:0;transition:opacity 420ms var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      white-space:pre;text-align:center;
+    }
+    .message.show{opacity:1}
+
+    .badge{
+      position:absolute;left:10px;top:10px;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+    }
+    .badge.on{opacity:1;transform:translateY(0)}
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @media (max-width:980px){
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Prism Runner · Fixed Build</div>
+        <h1>Prism Runner</h1>
+      </div>
+      <div class="meta">
+        <span>left/right + dash</span><span>·</span>
+        <span>rhythm obstacles</span><span>·</span>
+        <span>world flow</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <canvas id="game" width="1280" height="760"></canvas>
+      <div class="overlay">
+        <div class="badge" id="dashBadge">Dash</div>
+        <div class="message" id="message"></div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Puntaje:</span> <b id="scoreLabel">0</b></div>
+        <div><span>Velocidad:</span> <b id="speedLabel">1.00x</b></div>
+        <div><span>Combo:</span> <b id="comboLabel">x1</b></div>
+        <div><span>Dash CD:</span> <b id="dashLabel">Ready</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+
+      const scoreLabel = document.getElementById('scoreLabel');
+      const speedLabel = document.getElementById('speedLabel');
+      const comboLabel = document.getElementById('comboLabel');
+      const dashLabel = document.getElementById('dashLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      const dashBadge = document.getElementById('dashBadge');
+      const messageEl = document.getElementById('message');
+
+      let soundOn = true;
+      let actx = null;
+      const audio = () => {
+        if (!soundOn) return null;
+        if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        return actx;
+      };
+      const tone = (f=440,d=.08,t='sine',g=.03,delay=0) => {
+        const c = audio(); if(!c) return;
+        const t0 = c.currentTime + delay;
+        const o = c.createOscillator();
+        const ga = c.createGain();
+        o.type = t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination);
+        o.start(t0); o.stop(t0+d+0.02);
+      };
+
+      const sfx = {
+        beat:()=>tone(260,.05,'triangle',.012),
+        dash:()=>{ tone(520,.05,'triangle',.03); tone(800,.08,'sine',.025,.04); },
+        near:()=>tone(430,.04,'sine',.018),
+        hit:()=>{ tone(170,.12,'triangle',.04); tone(120,.16,'sine',.03,.08); }
+      };
+
+      const W = canvas.width;
+      const H = canvas.height;
+      const CX = W * 0.5;
+      const HORIZON = H * 0.28;
+      const RUNNER_Y = H * 0.82;
+      const LANE_W = 150;
+
+      const st = {
+        running:true,
+        over:false,
+        time:0,
+        score:0,
+        speed:1,
+        lane:0,       // visual smooth
+        laneTarget:0, // -1 0 1
+        dash:false,
+        dashT:0,
+        dashDur:0.16,
+        dashCd:0,
+        dashCdMax:1.8,
+        obstacles:[],
+        beatT:0,
+        beatDur:60/120, // 120 bpm
+        combo:1,
+        comboT:0,
+        lines:[],
+        backShapes:[],
+        last:performance.now()
+      };
+
+      const keys = new Set();
+      addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        if(['arrowleft','arrowright','a','d',' ','shift'].includes(k)) e.preventDefault();
+        keys.add(k);
+        if(k===' ') doDash();
+      });
+      addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+
+      function doDash(){
+        if(st.over || !st.running) return;
+        if(st.dashCd > 0) return;
+        st.dash = true;
+        st.dashT = st.dashDur;
+        st.dashCd = st.dashCdMax;
+        dashBadge.classList.add('on');
+        setTimeout(()=>dashBadge.classList.remove('on'),300);
+        sfx.dash();
+      }
+
+      function showMessage(txt, ms=900){
+        messageEl.textContent = txt;
+        messageEl.classList.add('show');
+        setTimeout(()=>messageEl.classList.remove('show'), ms);
+      }
+
+      function project(z, lane=0){
+        // z: 1.4 far -> 0 near
+        const t = Math.max(0, Math.min(1, 1 - z));
+        const y = HORIZON + (RUNNER_Y - HORIZON) * t;
+        const laneScale = 0.25 + 0.75 * t;
+        const x = CX + lane * LANE_W * laneScale;
+        const s = 0.2 + 1.25 * t;
+        return {x,y,s,t};
+      }
+
+      function initScene(){
+        st.lines = [];
+        for(let i=0;i<40;i++){
+          st.lines.push({z:Math.random()*1.4, x:(Math.random()*2-1), a:0.08+Math.random()*0.1});
+        }
+        st.backShapes = [];
+        for(let i=0;i<20;i++){
+          st.backShapes.push({z:Math.random()*1.4, x:(Math.random()*2-1), r:Math.random()*Math.PI, sz:12+Math.random()*30, sp:0.1+Math.random()*0.2});
+        }
+      }
+
+      function spawnObstacle(){
+        const type = Math.random()>.5 ? 'prism' : 'plane';
+        const lane = [-1,0,1][(Math.random()*3)|0];
+        st.obstacles.push({
+          type,
+          lane,
+          z:1.35 + Math.random()*0.25,
+          w:type==='prism' ? 70 : 130,
+          h:type==='prism' ? 80 : 28,
+          rot:Math.random()*Math.PI,
+          nearDone:false
+        });
+      }
+
+      function update(dt){
+        if(!st.running || st.over) return;
+
+        st.time += dt;
+        st.speed = 1 + Math.min(1.8, st.time * 0.02);
+
+        // Input lane
+        if(keys.has('arrowleft') || keys.has('a')) st.laneTarget = -1;
+        else if(keys.has('arrowright') || keys.has('d')) st.laneTarget = 1;
+        else st.laneTarget = 0;
+
+        st.lane += (st.laneTarget - st.lane) * Math.min(1, dt * 12);
+
+        // Dash
+        if(st.dashCd > 0) st.dashCd -= dt;
+        if(st.dash){
+          st.dashT -= dt;
+          if(st.dashT <= 0){ st.dash = false; st.dashT = 0; }
+        }
+
+        // Combo decay
+        if(st.comboT > 0){
+          st.comboT -= dt;
+          if(st.comboT <= 0){ st.combo = 1; st.comboT = 0; }
+        }
+
+        // Beat spawner
+        st.beatT += dt;
+        if(st.beatT >= st.beatDur){
+          st.beatT -= st.beatDur;
+          sfx.beat();
+          if(Math.random() > 0.28) spawnObstacle();
+          if(Math.random() > 0.86) spawnObstacle();
+        }
+
+        // Obstacles movement/collision
+        const flow = 0.55 * (1 + st.speed*0.55);
+        for(let i=st.obstacles.length-1;i>=0;i--){
+          const o = st.obstacles[i];
+          o.z -= flow * dt;
+          o.rot += dt * (o.type==='prism' ? 1.2 : 0.8);
+
+          if(!o.nearDone && o.z < 0.3 && o.z > 0.2){
+            const laneDiff = Math.abs(st.laneTarget - o.lane);
+            if(laneDiff === 1){
+              o.nearDone = true;
+              st.combo = Math.min(9, st.combo+1);
+              st.comboT = 1.6;
+              st.score += 6 * st.combo;
+              sfx.near();
+            }
+          }
+
+          if(o.z <= 0.16){
+            const hit = (o.lane === st.laneTarget);
+            if(hit && !st.dash){
+              st.over = true;
+              st.running = false;
+              stateLabel.textContent = 'Impacto';
+              showMessage('Signal Break',1200);
+              sfx.hit();
+            }else{
+              st.score += 12 * st.combo;
+            }
+            st.obstacles.splice(i,1);
+            continue;
+          }
+
+          if(o.z < -0.1) st.obstacles.splice(i,1);
+        }
+
+        st.score += dt * 12 * st.speed;
+      }
+
+      function drawBackground(dt){
+        ctx.fillStyle = '#040404';
+        ctx.fillRect(0,0,W,H);
+
+        // Vignette
+        const g = ctx.createRadialGradient(CX,H*0.56,120, CX,H*0.56, H*0.8);
+        g.addColorStop(0,'rgba(255,255,255,0.03)');
+        g.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,W,H);
+
+        // Back geometry
+        for(const b of st.backShapes){
+          b.z -= dt * (0.1 + b.sp*st.speed*0.3);
+          if(b.z < -0.05) b.z = 1.4;
+          const p = project(b.z, b.x*1.2);
+          const sz = b.sz * p.s * 0.8;
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          ctx.rotate(b.r + st.time*0.2);
+          ctx.strokeStyle = `rgba(255,255,255,${0.06 + p.t*0.08})`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-sz*.5,-sz*.5,sz,sz);
+          ctx.restore();
+        }
+
+        // Main lane guide
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(CX, HORIZON);
+        ctx.lineTo(CX, RUNNER_Y + 70);
+        ctx.stroke();
+
+        // Flow lines
+        for(const l of st.lines){
+          l.z -= dt * (0.9 * (1 + st.speed*0.4));
+          if(l.z < 0) l.z = 1.4;
+          const p = project(l.z, l.x*1.2);
+          const len = 16 * p.s;
+          ctx.strokeStyle = `rgba(255,255,255,${l.a + p.t*0.12})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x, p.y + len);
+          ctx.stroke();
+        }
+      }
+
+      function drawObstacle(o){
+        const p = project(o.z, o.lane);
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(o.rot * 0.12);
+
+        if(o.type === 'prism'){
+          const w = o.w * p.s * 0.24;
+          const h = o.h * p.s * 0.24;
+          ctx.fillStyle = '#dbdbdb';
+          ctx.fillRect(-w/2,-h/2,w,h);
+          ctx.fillStyle = '#b8b8b8';
+          ctx.fillRect(w/2,-h/2,Math.max(2,6*p.s),h);
+          ctx.fillStyle = '#989898';
+          ctx.fillRect(-w/2,h/2,w+Math.max(2,6*p.s),Math.max(2,6*p.s));
+          ctx.strokeStyle = `rgba(255,255,255,${0.1 + p.t*0.15})`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-w*0.62,-h*0.62,w*1.24,h*1.24);
+        } else {
+          const w = o.w * p.s * 0.34;
+          const h = o.h * p.s * 0.36;
+          ctx.fillStyle = '#d0d0d0';
+          ctx.fillRect(-w/2,-h/2,w,h);
+          ctx.strokeStyle = `rgba(255,255,255,${0.09 + p.t*0.12})`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-w*0.55,-h*0.55,w*1.1,h*1.1);
+        }
+
+        ctx.restore();
+      }
+
+      function drawRunner(){
+        const p = project(0.03, st.lane);
+        const x = p.x, y = RUNNER_Y;
+
+        const k = st.dash ? 1.2 : 1;
+
+        ctx.save();
+        ctx.translate(x,y);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.ellipse(0,18,26*k,9,0,0,Math.PI*2);
+        ctx.fill();
+
+        const w = 30*k, h = 34;
+        ctx.fillStyle = '#efefef';
+        ctx.fillRect(-w/2,-h/2,w,h);
+        ctx.fillStyle = '#cbcbcb';
+        ctx.fillRect(w/2,-h/2,8,h);
+        ctx.fillStyle = '#a9a9a9';
+        ctx.fillRect(-w/2,h/2,w+8,8);
+
+        if(st.dash){
+          ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+          ctx.lineWidth = 1.4;
+          ctx.strokeRect(-w*0.62,-h*0.62,w*1.24,h*1.24);
+        }
+
+        ctx.restore();
+      }
+
+      function draw(dt){
+        drawBackground(dt);
+        const sorted = [...st.obstacles].sort((a,b)=>b.z-a.z);
+        for(const o of sorted) drawObstacle(o);
+        drawRunner();
+      }
+
+      function hud(){
+        scoreLabel.textContent = Math.floor(st.score);
+        speedLabel.textContent = `${st.speed.toFixed(2)}x`;
+        comboLabel.textContent = `x${st.combo}`;
+        dashLabel.textContent = st.dashCd <= 0 ? 'Ready' : `${st.dashCd.toFixed(1)}s`;
+      }
+
+      function reset(){
+        st.running = true;
+        st.over = false;
+        st.time = 0;
+        st.score = 0;
+        st.speed = 1;
+        st.lane = 0;
+        st.laneTarget = 0;
+        st.dash = false;
+        st.dashT = 0;
+        st.dashCd = 0;
+        st.obstacles = [];
+        st.beatT = 0;
+        st.combo = 1;
+        st.comboT = 0;
+        stateLabel.textContent = 'Activo';
+        pauseBtn.textContent = 'Pause';
+        messageEl.classList.remove('show');
+        initScene();
+        for(let i=0;i<3;i++) spawnObstacle();
+        hud();
+      }
+
+      function togglePause(){
+        if(st.over) return;
+        st.running = !st.running;
+        pauseBtn.textContent = st.running ? 'Pause' : 'Resume';
+        stateLabel.textContent = st.running ? 'Activo' : 'Pausado';
+      }
+
+      function loop(now){
+        const dt = Math.min(0.05, (now - st.last)/1000);
+        st.last = now;
+
+        update(dt);
+        draw(dt);
+        hud();
+
+        requestAnimationFrame(loop);
+      }
+
+      soundBtn.addEventListener('click', ()=>{
+        soundOn = !soundOn;
+        soundBtn.textContent = `Sound: ${soundOn ? 'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', reset);
+
+      reset();
+      st.last = performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

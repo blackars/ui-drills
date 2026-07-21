@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit Lock // Precision Timing</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.14);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.8vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,38px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{min-height:0;display:grid;place-items:center;position:relative}
+    canvas{
+      width:min(96vw,980px);
+      height:min(70vh,760px);
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      image-rendering:high-quality;
+    }
+
+    .overlay{
+      position:absolute;
+      width:min(96vw,980px);
+      height:min(70vh,760px);
+      pointer-events:none;
+    }
+
+    .badge{
+      position:absolute;left:10px;top:10px;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+    }
+    .badge.on{opacity:1;transform:translateY(0)}
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,22px);letter-spacing:.2em;text-transform:uppercase;
+      opacity:0;transition:opacity 380ms var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      white-space:pre;text-align:center;
+    }
+    .message.show{opacity:1}
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @media (max-width:980px){
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Orbit Lock · Precision Instrument</div>
+        <h1>Orbit Lock</h1>
+      </div>
+      <div class="meta">
+        <span>timing</span><span>·</span>
+        <span>inertia physics</span><span>·</span>
+        <span>progressive complexity</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <canvas id="game" width="1100" height="760"></canvas>
+      <div class="overlay">
+        <div class="badge" id="lockBadge">LOCK</div>
+        <div class="message" id="message"></div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Nivel:</span> <b id="levelLabel">1</b></div>
+        <div><span>Puntaje:</span> <b id="scoreLabel">0</b></div>
+        <div><span>Precisión:</span> <b id="accLabel">100%</b></div>
+        <div><span>Objetivo:</span> <b id="targetLabel">2 segmentos</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // ---------- DOM ----------
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+
+      const lockBadge = document.getElementById('lockBadge');
+      const messageEl = document.getElementById('message');
+
+      const levelLabel = document.getElementById('levelLabel');
+      const scoreLabel = document.getElementById('scoreLabel');
+      const accLabel = document.getElementById('accLabel');
+      const targetLabel = document.getElementById('targetLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // ---------- Audio ----------
+      let soundOn = true;
+      let actx = null;
+      function audio(){ if(!soundOn) return null; if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+      function tone(f=440,d=.08,t='sine',g=.03,delay=0){
+        const c=audio(); if(!c) return;
+        const t0=c.currentTime+delay, o=c.createOscillator(), ga=c.createGain();
+        o.type=t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination); o.start(t0); o.stop(t0+d+0.02);
+      }
+      const sfx = {
+        tick:()=>tone(300,.04,'triangle',.012),
+        lock:(q=1)=>{ tone(520+q*40,.06,'sine',.03); tone(760+q*24,.08,'sine',.024,.05); },
+        fail:()=>{ tone(170,.11,'triangle',.04); tone(120,.13,'sine',.03,.06); },
+        level:()=>{ tone(460,.08,'sine',.03); tone(620,.1,'triangle',.03,.07); tone(880,.12,'sine',.03,.16); }
+      };
+
+      // ---------- Helpers ----------
+      const TAU = Math.PI*2;
+      const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+      const lerp = (a,b,t)=>a+(b-a)*t;
+
+      function normalizeAngle(a){
+        a %= TAU;
+        return a < 0 ? a + TAU : a;
+      }
+
+      function shortestAngleDiff(a,b){
+        let d = normalizeAngle(a) - normalizeAngle(b);
+        if(d > Math.PI) d -= TAU;
+        if(d < -Math.PI) d += TAU;
+        return d;
+      }
+
+      // ---------- Game State ----------
+      const W = canvas.width, H = canvas.height;
+      const CX = W*0.5, CY = H*0.52;
+
+      const st = {
+        running:true,
+        over:false,
+        level:1,
+        score:0,
+        totalAttempts:0,
+        totalSuccess:0,
+
+        rings:[],
+        targetSegments:2, // 2-3
+        tolerance:0.09, // rad
+        refAngle:0, // fixed marker
+
+        pulse:0,
+        last:performance.now()
+      };
+
+      // ring model with inertia
+      // angle, vel, torque, damping, inertia
+      function makeRing(i, radius){
+        const dir = i % 2 === 0 ? 1 : -1;
+        const baseVel = (0.45 + i*0.16) * dir;
+        const segments = 6 + i*2;
+        return {
+          i,
+          radius,
+          width: 14 - i*2,
+          angle: Math.random()*TAU,
+          vel: baseVel,
+          desiredVel: baseVel,
+          maxVel: 1.8 + i*0.25,
+          damping: 0.92 - i*0.04, // "peso" (más bajo = frena más)
+          inertia: 0.35 + i*0.18, // más alto = responde más lento
+          segments,
+          lockProgress:0 // anim visual
+        };
+      }
+
+      function buildLevel(level){
+        st.rings = [];
+        const ringCount = clamp(1 + Math.floor((level-1)/2), 1, 3); // 1..3
+        st.targetSegments = ringCount < 2 ? 2 : 3;
+
+        const baseR = 108;
+        for(let i=0;i<ringCount;i++){
+          st.rings.push(makeRing(i, baseR + i*56));
+        }
+
+        // dificultad
+        st.tolerance = clamp(0.11 - (level-1)*0.006, 0.055, 0.11);
+        st.refAngle = normalizeAngle(Math.random()*TAU);
+        targetLabel.textContent = `${st.targetSegments} segmentos`;
+      }
+
+      function reset(){
+        st.running = true;
+        st.over = false;
+        st.level = 1;
+        st.score = 0;
+        st.totalAttempts = 0;
+        st.totalSuccess = 0;
+        st.pulse = 0;
+        stateLabel.textContent = 'Activo';
+        pauseBtn.textContent = 'Pause';
+        showMessage('',10);
+        buildLevel(1);
+        updateHUD();
+      }
+
+      // ---------- Input ----------
+      // Control minimal:
+      // A/Left = aplicar torque negativo
+      // D/Right = aplicar torque positivo
+      // Space = intentar lock
+      const keys = new Set();
+      window.addEventListener('keydown', e=>{
+        const k=e.key.toLowerCase();
+        if(['arrowleft','arrowright','a','d',' '].includes(k)) e.preventDefault();
+        keys.add(k);
+        if(k===' ') attemptLock();
+      });
+      window.addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+
+      function controlInput(dt){
+        let torqueInput = 0;
+        if(keys.has('arrowleft') || keys.has('a')) torqueInput -= 1;
+        if(keys.has('arrowright') || keys.has('d')) torqueInput += 1;
+
+        // aplica torque a todos los anillos con distinta respuesta por inercia
+        for(const r of st.rings){
+          const torque = torqueInput * 2.2 / (1 + r.i*0.4);
+          r.desiredVel += torque * dt;
+          r.desiredVel = clamp(r.desiredVel, -r.maxVel, r.maxVel);
+        }
+      }
+
+      // ---------- Lock Logic ----------
+      function ringAligned(r){
+        // cada segmento está a: r.angle + k*(TAU/segments)
+        // éxito si alguno cae cerca de refAngle
+        const step = TAU / r.segments;
+        const rel = normalizeAngle(st.refAngle - r.angle);
+        const k = Math.round(rel / step);
+        const segAngle = normalizeAngle(r.angle + k*step);
+        const d = Math.abs(shortestAngleDiff(segAngle, st.refAngle));
+        return d <= st.tolerance;
+      }
+
+      function attemptLock(){
+        if(!st.running || st.over) return;
+
+        st.totalAttempts++;
+
+        let alignedCount = 0;
+        for(const r of st.rings){
+          if(ringAligned(r)) alignedCount++;
+        }
+
+        if(alignedCount >= st.targetSegments){
+          st.totalSuccess++;
+          const quality = alignedCount / st.rings.length;
+          const gain = Math.round(100 * quality + st.level * 12);
+          st.score += gain;
+          st.pulse = 1;
+          lockBadge.classList.add('on');
+          setTimeout(()=>lockBadge.classList.remove('on'),280);
+          sfx.lock(quality);
+          showMessage(`LOCK +${gain}`, 420);
+
+          // transición nivel
+          if(st.level < 12){
+            st.level++;
+            setTimeout(()=>{
+              sfx.level();
+              buildLevel(st.level);
+              showMessage(`LEVEL ${st.level}`, 520);
+              updateHUD();
+            }, 240);
+          }
+        }else{
+          // fallo: por inercia, los anillos NO frenan instantáneamente, solo penaliza un poco
+          for(const r of st.rings){
+            r.desiredVel *= 0.86;
+          }
+          st.score = Math.max(0, st.score - 35);
+          sfx.fail();
+          showMessage('MISALIGN', 380);
+        }
+
+        updateHUD();
+      }
+
+      // ---------- Update ----------
+      function update(dt){
+        if(!st.running || st.over) return;
+
+        controlInput(dt);
+
+        for(const r of st.rings){
+          // dinámica inercial:
+          // vel tiende a desiredVel lentamente según inertia
+          const blend = clamp(dt / (r.inertia + 0.001), 0, 1);
+          r.vel = lerp(r.vel, r.desiredVel, blend);
+
+          // damping (resistencia)
+          r.vel *= Math.pow(r.damping, dt*8);
+
+          // evita quedar muerto totalmente
+          if(Math.abs(r.vel) < 0.04){
+            r.vel += (r.desiredVel >= 0 ? 1 : -1) * 0.02;
+          }
+
+          r.angle = normalizeAngle(r.angle + r.vel * dt);
+
+          // lock glow decay
+          r.lockProgress = Math.max(0, r.lockProgress - dt*2.4);
+        }
+
+        st.pulse = Math.max(0, st.pulse - dt*2.1);
+
+        // UI precision
+        updateHUD();
+      }
+
+      // ---------- Draw ----------
+      function drawBackground(){
+        ctx.fillStyle = '#040404';
+        ctx.fillRect(0,0,W,H);
+
+        // vignette
+        const g = ctx.createRadialGradient(CX,CY,100, CX,CY, H*0.7);
+        g.addColorStop(0,'rgba(255,255,255,0.03)');
+        g.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,W,H);
+
+        // crosshair instrument
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(CX-240,CY); ctx.lineTo(CX+240,CY);
+        ctx.moveTo(CX,CY-240); ctx.lineTo(CX,CY+240);
+        ctx.stroke();
+
+        // outer scale ticks
+        for(let i=0;i<60;i++){
+          const a = i/60*TAU;
+          const r1 = 240;
+          const r2 = (i%5===0) ? 254 : 248;
+          const x1 = CX + Math.cos(a)*r1;
+          const y1 = CY + Math.sin(a)*r1;
+          const x2 = CX + Math.cos(a)*r2;
+          const y2 = CY + Math.sin(a)*r2;
+          ctx.strokeStyle = i%5===0 ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)';
+          ctx.beginPath();
+          ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+          ctx.stroke();
+        }
+
+        // reference marker
+        const rx = CX + Math.cos(st.refAngle) * 268;
+        const ry = CY + Math.sin(st.refAngle) * 268;
+        ctx.fillStyle = '#f1f1f1';
+        ctx.beginPath();
+        ctx.arc(rx,ry,3.4 + st.pulse*1.5,0,TAU);
+        ctx.fill();
+      }
+
+      function drawRing(r){
+        const segStep = TAU / r.segments;
+        const ringBase = `rgba(255,255,255,${0.14 + r.i*0.03})`;
+        const ringHot = `rgba(255,255,255,0.92)`;
+
+        // ring base circle
+        ctx.strokeStyle = ringBase;
+        ctx.lineWidth = r.width;
+        ctx.beginPath();
+        ctx.arc(CX,CY,r.radius,0,TAU);
+        ctx.stroke();
+
+        // segments
+        for(let k=0;k<r.segments;k++){
+          const a = normalizeAngle(r.angle + k*segStep);
+          const span = segStep * 0.42; // tamaño segmento
+          const start = a - span*0.5;
+          const end   = a + span*0.5;
+
+          const d = Math.abs(shortestAngleDiff(a, st.refAngle));
+          const isNear = d < st.tolerance*2.2;
+          ctx.strokeStyle = isNear ? ringHot : `rgba(255,255,255,0.36)`;
+          ctx.lineWidth = r.width * (isNear ? 1.1 : 1);
+
+          ctx.beginPath();
+          ctx.arc(CX,CY,r.radius,start,end);
+          ctx.stroke();
+        }
+
+        // pointer for ring current phase
+        const px = CX + Math.cos(r.angle)*r.radius;
+        const py = CY + Math.sin(r.angle)*r.radius;
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.beginPath();
+        ctx.arc(px,py,2.8,0,TAU);
+        ctx.fill();
+      }
+
+      function drawCenterCore(){
+        // center core
+        const r = 44 + st.pulse*6;
+        const grad = ctx.createRadialGradient(CX,CY,2,CX,CY,r);
+        grad.addColorStop(0,'rgba(255,255,255,0.55)');
+        grad.addColorStop(1,'rgba(255,255,255,0.08)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(CX,CY,r,0,TAU);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(CX,CY,62,0,TAU);
+        ctx.stroke();
+
+        // center label
+        ctx.fillStyle = 'rgba(255,255,255,0.76)';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PRESS SPACE TO LOCK', CX, CY);
+      }
+
+      function draw(){
+        drawBackground();
+        for(const r of st.rings) drawRing(r);
+        drawCenterCore();
+      }
+
+      // ---------- HUD ----------
+      function updateHUD(){
+        levelLabel.textContent = st.level;
+        scoreLabel.textContent = Math.floor(st.score);
+
+        const acc = st.totalAttempts === 0 ? 100 : (st.totalSuccess / st.totalAttempts) * 100;
+        accLabel.textContent = `${acc.toFixed(0)}%`;
+
+        targetLabel.textContent = `${st.targetSegments} segmentos`;
+      }
+
+      function showMessage(txt, ms=560){
+        if(!txt){
+          messageEl.classList.remove('show');
+          messageEl.textContent='';
+          return;
+        }
+        messageEl.textContent = txt;
+        messageEl.classList.add('show');
+        clearTimeout(showMessage._t);
+        showMessage._t = setTimeout(()=>messageEl.classList.remove('show'), ms);
+      }
+
+      function togglePause(){
+        if(st.over) return;
+        st.running = !st.running;
+        pauseBtn.textContent = st.running ? 'Pause' : 'Resume';
+        stateLabel.textContent = st.running ? 'Activo' : 'Pausado';
+      }
+
+      // ---------- Loop ----------
+      function loop(now){
+        const dt = Math.min(0.05, (now - st.last)/1000);
+        st.last = now;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(loop);
+      }
+
+      // ---------- Controls ----------
+      soundBtn.addEventListener('click', ()=>{
+        soundOn = !soundOn;
+        soundBtn.textContent = `Sound: ${soundOn ? 'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', reset);
+
+      // ---------- Start ----------
+      reset();
+      st.last = performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

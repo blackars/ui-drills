@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scroll Tunnel — B/W Minimal</title>
+  <style>
+    :root{
+      --bg:#060606;
+      --fg:#f2f2f2;
+      --muted:#8f8f8f;
+      --line:#2a2a2a;
+      --panel:#0e0e0e;
+      --danger:#d9d9d9;
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      background:var(--bg);
+      color:var(--fg);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow-x:hidden;
+      cursor:crosshair;
+    }
+
+    /* Scroll largo para “viaje” */
+    body{
+      min-height:14000px;
+      background:
+        radial-gradient(circle at 50% 35%, #101010 0%, #080808 34%, #050505 70%, #030303 100%);
+    }
+
+    canvas#scene{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      display:block;
+      z-index:1;
+    }
+
+    .hud{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:5;
+    }
+
+    .title{
+      position:absolute;
+      top:28px;
+      left:28px;
+      letter-spacing:.22em;
+      font-size:11px;
+      text-transform:uppercase;
+      color:#d8d8d8;
+      opacity:.9;
+      mix-blend-mode:screen;
+    }
+
+    .subtitle{
+      position:absolute;
+      top:46px;
+      left:28px;
+      letter-spacing:.08em;
+      font-size:10px;
+      color:var(--muted);
+      text-transform:uppercase;
+    }
+
+    .progress{
+      position:absolute;
+      right:28px;
+      top:28px;
+      width:180px;
+      height:1px;
+      background:#1f1f1f;
+    }
+    .progress > i{
+      display:block;
+      height:100%;
+      width:0%;
+      background:#f0f0f0;
+      transition:width .08s linear;
+    }
+
+    .center-mark{
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:26px;
+      height:26px;
+      transform:translate(-50%,-50%);
+      border:1px solid #2f2f2f;
+      border-radius:50%;
+      opacity:.8;
+    }
+    .center-mark::before,.center-mark::after{
+      content:"";
+      position:absolute;
+      left:50%;
+      top:50%;
+      background:#3a3a3a;
+      transform:translate(-50%,-50%);
+    }
+    .center-mark::before{width:8px;height:1px}
+    .center-mark::after{width:1px;height:8px}
+
+    .status{
+      position:absolute;
+      left:28px;
+      bottom:24px;
+      font-size:10px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#9f9f9f;
+      line-height:1.8;
+      white-space:pre;
+    }
+
+    .game{
+      position:absolute;
+      right:28px;
+      bottom:24px;
+      text-align:right;
+      font-size:10px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#bcbcbc;
+      line-height:1.8;
+    }
+    .hint{
+      opacity:.6;
+      font-size:9px;
+      letter-spacing:.1em;
+    }
+
+    .vignette{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:4;
+      background:
+        radial-gradient(circle at center, transparent 42%, rgba(0,0,0,.35) 78%, rgba(0,0,0,.78) 100%);
+    }
+
+    .grain{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:6;
+      opacity:.05;
+      background-image:
+        repeating-radial-gradient(circle at 30% 40%, #fff 0 1px, transparent 1px 2px),
+        repeating-radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 1px 3px);
+      mix-blend-mode:soft-light;
+      filter:contrast(180%);
+      animation:grainShift .25s steps(2) infinite;
+    }
+    @keyframes grainShift{
+      0%{transform:translate(0,0)}
+      50%{transform:translate(-1px,1px)}
+      100%{transform:translate(1px,-1px)}
+    }
+
+    .legend{
+      position:fixed;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      color:#8a8a8a;
+      font-size:9px;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+      z-index:7;
+      opacity:.72;
+      pointer-events:none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div class="hud">
+    <div class="title">Scroll Tunnel / Infinite Depth</div>
+    <div class="subtitle">B/W Hypminimal Scrollytelling</div>
+
+    <div class="progress"><i id="bar"></i></div>
+    <div class="center-mark"></div>
+
+    <div class="status" id="status">
+SECTOR: 00
+DEPTH: 0000
+SPIN: 0.00
+    </div>
+
+    <div class="game" id="gameInfo">
+ALIGN MODE: OFF
+SCORE: 0000
+<div class="hint">Press [G] to toggle mini‑game</div>
+    </div>
+  </div>
+
+  <div class="vignette"></div>
+  <div class="grain"></div>
+  <div class="legend">Scroll to travel · Mouse to align · G mini-game</div>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('scene');
+      const ctx = canvas.getContext('2d');
+      const bar = document.getElementById('bar');
+      const statusEl = document.getElementById('status');
+      const gameInfo = document.getElementById('gameInfo');
+
+      let w = 0, h = 0, cx = 0, cy = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      const state = {
+        scrollNorm: 0,
+        scrollPx: 0,
+        targetNorm: 0,
+        t: 0,
+        spin: 0,
+        sections: 8,
+        mouseX: 0,
+        mouseY: 0,
+        gameOn: false,
+        score: 0,
+        best: 0,
+        alignError: 0
+      };
+
+      const tunnelDepth = 160;
+      const rings = [];
+      const words = [
+        "ENTER", "SIGNAL", "NULL", "PHASE", "VECTOR", "MONO", "NOISE", "FRAME",
+        "OFFSET", "GLYPH", "SECTOR", "PULSE", "TRACE", "DEPTH", "AXIS", "LOOP"
+      ];
+
+      function resize() {
+        w = window.innerWidth;
+        h = window.innerHeight;
+        cx = w * 0.5;
+        cy = h * 0.5;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function buildTunnel() {
+        rings.length = 0;
+        for (let i = 0; i < tunnelDepth; i++) {
+          const z = i / tunnelDepth;
+          rings.push({
+            z,
+            baseR: 26 + i * 6.2,
+            type: i % 6, // alterna geometrías
+            rot: Math.random() * Math.PI * 2,
+            wobble: 0.3 + Math.random() * 1.2,
+            word: words[i % words.length],
+            dash: 8 + (i % 5) * 6
+          });
+        }
+      }
+
+      function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+      function lerp(a,b,t){ return a + (b-a)*t; }
+
+      function getSection(norm){
+        return Math.floor(norm * state.sections) % state.sections;
+      }
+
+      // paleta oscura por secciones (solo grises)
+      function sectionTone(sec){
+        const tones = [8, 11, 14, 9, 16, 12, 18, 10];
+        return tones[sec % tones.length];
+      }
+
+      function drawRing(r, travel, sec, localSpin){
+        // z animado por “viaje”
+        let z = (r.z - travel % 1);
+        if (z < 0) z += 1;
+
+        // perspectiva
+        const depth = 1 - z;
+        const p = Math.pow(depth, 2.2); // enfatiza acercamiento
+        const radius = r.baseR * (0.18 + p * 1.15);
+
+        // espiral / offset
+        const ang = r.rot + localSpin * 1.8 + z * 12.0 + Math.sin(state.t*0.7 + r.z*9)*0.06;
+        const spiral = 90 * (1 - depth) * 0.06;
+        const ox = Math.cos(ang * 0.85) * spiral;
+        const oy = Math.sin(ang) * spiral;
+
+        const x = cx + ox;
+        const y = cy + oy;
+
+        const alpha = clamp(0.1 + p * 1.2, 0, .95);
+        const lw = clamp(0.6 + p * 2.2, .6, 2.6);
+
+        // color monocromo dinámico
+        const toneBase = sectionTone(sec);
+        const l = Math.floor(toneBase + p * 72);
+        ctx.strokeStyle = `rgba(${l},${l},${l},${alpha})`;
+        ctx.lineWidth = lw;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + localSpin * 0.2);
+
+        switch(r.type){
+          case 0: // círculo
+            ctx.beginPath();
+            ctx.arc(0,0,radius,0,Math.PI*2);
+            ctx.stroke();
+            break;
+          case 1: // cuadrado
+            ctx.strokeRect(-radius*0.78,-radius*0.78,radius*1.56,radius*1.56);
+            break;
+          case 2: // rombo
+            ctx.rotate(Math.PI/4);
+            ctx.strokeRect(-radius*0.72,-radius*0.72,radius*1.44,radius*1.44);
+            break;
+          case 3: // hex
+            polygon(6, radius*0.92);
+            break;
+          case 4: // tri
+            polygon(3, radius);
+            break;
+          case 5: // ring dashed
+            ctx.setLineDash([r.dash, r.dash * 0.7]);
+            ctx.beginPath();
+            ctx.arc(0,0,radius,0,Math.PI*2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            break;
+        }
+
+        // texto señalización cada ciertos anillos
+        if ((Math.floor(r.z * tunnelDepth) % 10 === 0) && p > 0.17){
+          drawCircularText(r.word, radius * 1.05, alpha * 0.9, p);
+        }
+
+        ctx.restore();
+      }
+
+      function polygon(sides, r){
+        ctx.beginPath();
+        for(let i=0;i<sides;i++){
+          const a = (i/sides) * Math.PI*2;
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if(i===0) ctx.moveTo(px,py);
+          else ctx.lineTo(px,py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      function drawCircularText(text, radius, alpha, p){
+        ctx.save();
+        ctx.rotate(-Math.PI/2);
+        const chars = (text + " • ").split("");
+        const step = (Math.PI*2) / chars.length;
+        ctx.fillStyle = `rgba(235,235,235,${clamp(alpha,0,.75)})`;
+        ctx.font = `${Math.floor(8 + p * 14)}px Inter, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for(let i=0;i<chars.length;i++){
+          ctx.save();
+          const a = i * step;
+          ctx.rotate(a);
+          ctx.translate(radius,0);
+          ctx.rotate(Math.PI/2);
+          ctx.fillText(chars[i],0,0);
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+
+      function render() {
+        state.t += 0.016;
+        state.scrollPx = window.scrollY || window.pageYOffset;
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        state.targetNorm = maxScroll > 0 ? state.scrollPx / maxScroll : 0;
+        state.scrollNorm = lerp(state.scrollNorm, state.targetNorm, 0.12);
+        state.spin = lerp(state.spin, (state.scrollNorm * Math.PI * 4.5), 0.08);
+
+        // fondo por sección
+        const sec = getSection(state.scrollNorm);
+        const tone = sectionTone(sec);
+        ctx.fillStyle = `rgb(${tone},${tone},${tone})`;
+        ctx.fillRect(0,0,w,h);
+
+        // gradiente central sutil
+        const g = ctx.createRadialGradient(cx,cy,20,cx,cy,Math.max(w,h)*0.62);
+        g.addColorStop(0, `rgba(22,22,22,0.55)`);
+        g.addColorStop(1, `rgba(0,0,0,0.0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,w,h);
+
+        // viaje: multiplica para sensación infinita
+        const travel = state.scrollNorm * 22.0;
+
+        // dibujo túnel back-to-front
+        for(let i=rings.length-1; i>=0; i--){
+          drawRing(rings[i], travel, sec, state.spin);
+        }
+
+        // obstáculo mini-juego (alineación)
+        const obstacleA = state.t * 0.8 + travel * 1.35;
+        const obstacleR = Math.min(w,h) * 0.17;
+        const ox = cx + Math.cos(obstacleA) * obstacleR;
+        const oy = cy + Math.sin(obstacleA*1.23) * obstacleR * 0.64;
+
+        ctx.strokeStyle = "rgba(230,230,230,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(ox, oy, 12, 0, Math.PI*2);
+        ctx.stroke();
+
+        // retícula fina
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.moveTo(cx,0); ctx.lineTo(cx,h);
+        ctx.moveTo(0,cy); ctx.lineTo(w,cy);
+        ctx.stroke();
+
+        // mini-juego: mantener mouse cerca del centro
+        const dx = state.mouseX - cx;
+        const dy = state.mouseY - cy;
+        const distCenter = Math.hypot(dx,dy);
+        state.alignError = distCenter;
+
+        if(state.gameOn){
+          const ok = distCenter < 42;
+          state.score += ok ? 1 : -1;
+          if(state.score < 0) state.score = 0;
+          state.best = Math.max(state.best, state.score);
+
+          // feedback visual
+          ctx.strokeStyle = ok ? "rgba(245,245,245,0.65)" : "rgba(180,180,180,0.38)";
+          ctx.lineWidth = ok ? 1.8 : 1;
+          ctx.beginPath();
+          ctx.arc(cx,cy,38,0,Math.PI*2);
+          ctx.stroke();
+        }
+
+        bar.style.width = `${(state.targetNorm*100).toFixed(2)}%`;
+        statusEl.textContent =
+`SECTOR: ${String(sec).padStart(2,'0')}
+DEPTH: ${String(Math.floor(travel*100)).padStart(4,'0')}
+SPIN: ${state.spin.toFixed(2)}`;
+
+        gameInfo.innerHTML =
+`ALIGN MODE: ${state.gameOn ? 'ON' : 'OFF'}
+SCORE: ${String(state.score).padStart(4,'0')}  BEST: ${String(state.best).padStart(4,'0')}
+<div class="hint">Press [G] to toggle mini‑game</div>`;
+
+        requestAnimationFrame(render);
+      }
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('mousemove', (e)=>{
+        state.mouseX = e.clientX;
+        state.mouseY = e.clientY;
+      });
+
+      window.addEventListener('keydown', (e)=>{
+        if(e.key.toLowerCase() === 'g'){
+          state.gameOn = !state.gameOn;
+        }
+      });
+
+      resize();
+      buildTunnel();
+      state.mouseX = cx;
+      state.mouseY = cy;
+      render();
+    })();
+  </script>
+</body>
+</html>

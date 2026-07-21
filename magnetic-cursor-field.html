@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magnetic Cursor Field — Fixed</title>
+  <style>
+    :root{
+      --bg:#050505;
+      --fg:#f2f2f2;
+      --muted:#8e8e8e;
+      --line:rgba(255,255,255,.1);
+      --panel:rgba(255,255,255,.03);
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+    body{cursor:none;background:
+      radial-gradient(circle at 50% 35%,rgba(255,255,255,.05),transparent 35%),
+      linear-gradient(180deg,#0a0a0a,#030303)}
+    .app{height:100%;display:grid;grid-template-rows:auto 1fr auto;gap:16px;padding:20px;position:relative;z-index:2}
+    header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+    h1{font-size:clamp(28px,6vw,74px);line-height:.9;letter-spacing:-.05em}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .pill{border:1px solid var(--line);background:var(--panel);padding:8px 11px;border-radius:999px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#ddd}
+    main{border:1px solid var(--line);border-radius:none;position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015))}
+    .field{position:absolute;inset:0;touch-action:none}
+    .center{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:min(44vw,520px);aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.08);
+      display:grid;place-items:center;color:rgba(255,255,255,.45);font-size:12px;letter-spacing:.2em;text-transform:uppercase;pointer-events:none;
+      animation:pulse 4s ease-in-out infinite;
+    }
+    .center::before{content:"";position:absolute;width:72%;height:72%;border:1px solid rgba(255,255,255,.06);border-radius:50%}
+    .node{
+      position:absolute;left:0;top:0;transform:translate3d(var(--x),var(--y),0) scale(var(--s));
+      color:rgba(255,255,255,.78);will-change:transform,opacity;mix-blend-mode:screen;
+      opacity:var(--o);font-size:var(--f);letter-spacing:-.04em;
+    }
+    .node.dot::before{content:"";display:block;width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 10px rgba(255,255,255,.15)}
+    .node.char::before{content:attr(data-c)}
+    .node.hot{color:#fff}
+    footer{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .hint{font-size:12px;color:var(--muted)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      border:1px solid var(--line);background:var(--panel);color:#eee;border-radius:999px;padding:10px 13px;
+      font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:none;transition:.25s var(--ease)
+    }
+    button:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+    button.active{background:#f0f0f0;color:#0a0a0a;border-color:#fff}
+    .cursor{
+      position:fixed;left:0;top:0;width:20px;height:20px;border:1px solid rgba(255,255,255,.85);border-radius:50%;
+      transform:translate(-50%,-50%);pointer-events:none;z-index:99;mix-blend-mode:difference;transition:.2s var(--ease)
+    }
+    .cursor::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;border-radius:50%;background:#fff;transform:translate(-50%,-50%)}
+    .cursor.big{width:52px;height:52px;border-color:rgba(255,255,255,.45)}
+    .glow{
+      position:fixed;left:0;top:0;width:240px;height:240px;transform:translate(-50%,-50%);
+      border-radius:50%;pointer-events:none;z-index:1;background:radial-gradient(circle,rgba(255,255,255,.12),transparent 62%);filter:blur(12px)
+    }
+    @keyframes pulse{
+      0%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.45}
+      50%{transform:translate(-50%,-50%) scale(1.02);opacity:.78}
+    }
+    @media (max-width:760px){
+      body{cursor:auto}
+      .cursor,.glow{display:none}
+      button{cursor:pointer}
+      footer{display:grid}
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor"></div>
+  <div class="glow"></div>
+
+  <div class="app">
+    <header>
+      <h1>Magnetic<br/>Cursor Field</h1>
+      <div class="meta">
+        <div class="pill">Vanilla JS</div>
+        <div class="pill">B/W Minimal</div>
+        <div class="pill">Physics</div>
+      </div>
+    </header>
+
+    <main>
+      <section id="field" class="field">
+        <div class="center">Move / Attract / Repel</div>
+      </section>
+    </main>
+
+    <footer>
+      <p class="hint">Mueve el cursor dentro del panel. Click sostenido = boost. “Pull to Center” lleva todo al centro.</p>
+      <div class="controls">
+        <button id="modeBtn" class="active">Mode: Repel</button>
+        <button id="densityBtn">Density: High</button>
+        <button id="centerBtn">Pull to Center</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const field = document.getElementById('field');
+      const modeBtn = document.getElementById('modeBtn');
+      const densityBtn = document.getElementById('densityBtn');
+      const centerBtn = document.getElementById('centerBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const cursor = document.querySelector('.cursor');
+      const glow = document.querySelector('.glow');
+
+      const chars = ['M','A','G','N','E','T','I','C','•','·','×','○','+','—','0','1'];
+      const state = {
+        mode: 'repel', // repel | attract
+        density: 'high',
+        pressing: false,
+        pullCenter: false,
+        pointer: { x: innerWidth/2, y: innerHeight/2, tx: innerWidth/2, ty: innerHeight/2 },
+        rect: null,
+        nodes: [],
+        raf: 0
+      };
+
+      const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+      const lerp = (a,b,t)=>a+(b-a)*t;
+
+      function setRect(){ state.rect = field.getBoundingClientRect(); }
+
+      function makeNodes(){
+        state.nodes.forEach(n=>n.el.remove());
+        state.nodes = [];
+        setRect();
+        const {width,height} = state.rect;
+        const base = state.density === 'high' ? 220 : 120;
+        const count = Math.round((width*height)/9000) + base;
+
+        const frag = document.createDocumentFragment();
+
+        for(let i=0;i<count;i++){
+          const el = document.createElement('div');
+          const isChar = Math.random() > .45;
+          el.className = 'node ' + (isChar ? 'char':'dot');
+          if(isChar) el.dataset.c = chars[(Math.random()*chars.length)|0];
+
+          const x = Math.random()*width;
+          const y = Math.random()*height;
+          const size = isChar ? (10 + Math.random()*16) : (8 + Math.random()*10);
+
+          el.style.setProperty('--x', x+'px');
+          el.style.setProperty('--y', y+'px');
+          el.style.setProperty('--s', (0.8 + Math.random()*0.5).toFixed(2));
+          el.style.setProperty('--o', (0.25 + Math.random()*0.65).toFixed(2));
+          el.style.setProperty('--f', size+'px');
+
+          frag.appendChild(el);
+
+          state.nodes.push({
+            el,
+            x, y,
+            vx: 0, vy: 0,
+            ox: x, oy: y,
+            mass: 0.7 + Math.random()*1.6,
+            jitter: Math.random()*Math.PI*2
+          });
+        }
+        field.appendChild(frag);
+      }
+
+      function setPointer(clientX, clientY){
+        state.pointer.tx = clientX;
+        state.pointer.ty = clientY;
+      }
+
+      function updateCursor(){
+        state.pointer.x = lerp(state.pointer.x, state.pointer.tx, .22);
+        state.pointer.y = lerp(state.pointer.y, state.pointer.ty, .22);
+
+        cursor.style.transform = `translate(${state.pointer.x}px, ${state.pointer.y}px) translate(-50%,-50%)`;
+        glow.style.transform = `translate(${state.pointer.x}px, ${state.pointer.y}px) translate(-50%,-50%)`;
+      }
+
+      function tick(){
+        updateCursor();
+        const r = state.rect;
+        const px = state.pointer.x - r.left;
+        const py = state.pointer.y - r.top;
+        const cx = r.width * 0.5;
+        const cy = r.height * 0.5;
+
+        const radius = state.pressing ? 520 : 380;
+        const baseForce = state.pressing ? 1.35 : 0.72;
+        const direction = state.mode === 'repel' ? 1 : -1; // repel empuja, attract jala
+        const centerForce = state.pullCenter ? 0.065 : 0.0;
+
+        for(const n of state.nodes){
+          // Fuerza cursor
+          const dx = n.x - px;
+          const dy = n.y - py;
+          const d2 = dx*dx + dy*dy + 0.0001;
+          const d = Math.sqrt(d2);
+          const inRadius = d < radius ? 1 : 0;
+          const falloff = inRadius ? (1 - d/radius) : 0;
+          const force = baseForce * falloff * falloff;
+
+          const ux = dx / d;
+          const uy = dy / d;
+
+          // attract = hacia cursor => signo invertido
+          n.vx += ux * force * direction * (1.8 / n.mass);
+          n.vy += uy * force * direction * (1.8 / n.mass);
+
+          // Pequeño swirl para organicidad
+          const swirl = 0.018 * falloff * (state.mode === 'attract' ? 1 : -1);
+          n.vx += -uy * swirl;
+          n.vy += ux * swirl;
+
+          // Pull to center contundente
+          if(centerForce > 0){
+            const cdx = cx - n.x;
+            const cdy = cy - n.y;
+            n.vx += cdx * centerForce;
+            n.vy += cdy * centerForce;
+          }
+
+          // Resorte suave al origen para que no se “pierdan”
+          n.vx += (n.ox - n.x) * 0.0028;
+          n.vy += (n.oy - n.y) * 0.0028;
+
+          // Fricción
+          n.vx *= 0.92;
+          n.vy *= 0.92;
+
+          // Integración
+          n.x += n.vx;
+          n.y += n.vy;
+
+          // Boundaries suaves
+          if(n.x < -20) { n.x = -20; n.vx *= -0.35; }
+          if(n.y < -20) { n.y = -20; n.vy *= -0.35; }
+          if(n.x > r.width + 20) { n.x = r.width + 20; n.vx *= -0.35; }
+          if(n.y > r.height + 20) { n.y = r.height + 20; n.vy *= -0.35; }
+
+          // Visual
+          const speed = Math.min(1.8, Math.hypot(n.vx,n.vy));
+          const hot = falloff > 0.35 || speed > 0.7;
+          n.el.classList.toggle('hot', hot);
+          n.el.style.setProperty('--x', `${n.x}px`);
+          n.el.style.setProperty('--y', `${n.y}px`);
+          n.el.style.setProperty('--s', `${(1 + speed*0.08).toFixed(3)}`);
+          n.el.style.setProperty('--o', `${clamp(0.22 + speed*0.35 + falloff*0.55, 0.22, 1).toFixed(3)}`);
+        }
+
+        state.raf = requestAnimationFrame(tick);
+      }
+
+      function bind(){
+        addEventListener('resize', ()=>{ setRect(); makeNodes(); });
+
+        addEventListener('pointermove', e => setPointer(e.clientX, e.clientY));
+
+        addEventListener('pointerdown', e => {
+          state.pressing = true;
+          cursor.classList.add('big');
+          setPointer(e.clientX, e.clientY);
+        });
+
+        addEventListener('pointerup', ()=> {
+          state.pressing = false;
+          cursor.classList.remove('big');
+        });
+
+        modeBtn.addEventListener('click', ()=> {
+          state.mode = state.mode === 'repel' ? 'attract' : 'repel';
+          modeBtn.textContent = `Mode: ${state.mode === 'repel' ? 'Repel' : 'Attract'}`;
+          modeBtn.classList.toggle('active', state.mode === 'repel');
+        });
+
+        densityBtn.addEventListener('click', ()=> {
+          state.density = state.density === 'high' ? 'low' : 'high';
+          densityBtn.textContent = `Density: ${state.density === 'high' ? 'High' : 'Low'}`;
+          makeNodes();
+        });
+
+        centerBtn.addEventListener('pointerdown', ()=> {
+          state.pullCenter = true;
+          centerBtn.classList.add('active');
+        });
+
+        const stopCenter = ()=> {
+          state.pullCenter = false;
+          centerBtn.classList.remove('active');
+        };
+        centerBtn.addEventListener('pointerup', stopCenter);
+        centerBtn.addEventListener('pointerleave', stopCenter);
+
+        resetBtn.addEventListener('click', ()=> makeNodes());
+      }
+
+      function init(){
+        setRect();
+        makeNodes();
+        bind();
+        tick();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

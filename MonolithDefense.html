@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monolith Defense // Orbital Shield (Tunable)</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.14);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.8vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,38px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{min-height:0;display:grid;place-items:center;position:relative}
+    canvas{
+      width:min(96vw,1100px);
+      height:min(72vh,760px);
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      image-rendering:high-quality;
+    }
+
+    .overlay{
+      position:absolute;
+      width:min(96vw,1100px);
+      height:min(72vh,760px);
+      pointer-events:none;
+    }
+
+    .badge{
+      position:absolute;left:10px;top:10px;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+    }
+    .badge.on{opacity:1;transform:translateY(0)}
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,22px);letter-spacing:.2em;text-transform:uppercase;
+      opacity:0;transition:opacity 380ms var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      white-space:pre;text-align:center;
+    }
+    .message.show{opacity:1}
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @media (max-width:980px){
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Monolith Defense · Orbital Timing</div>
+        <h1>Monolith Defense</h1>
+      </div>
+      <div class="meta">
+        <span>angle + timing + energy</span><span>·</span>
+        <span>orbital shield</span><span>·</span>
+        <span>pulse shockwave</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <canvas id="game" width="1200" height="780"></canvas>
+      <div class="overlay">
+        <div class="badge" id="pulseBadge">PERFECT PULSE</div>
+        <div class="message" id="message"></div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Puntaje:</span> <b id="scoreLabel">0</b></div>
+        <div><span>Integridad:</span> <b id="hpLabel">100%</b></div>
+        <div><span>Energía:</span> <b id="energyLabel">100%</b></div>
+        <div><span>Combo:</span> <b id="comboLabel">x1</b></div>
+        <div><span>Shield Spd:</span> <b id="shieldSpdLabel">3.2</b></div>
+        <div><span>Spawn:</span> <b id="spawnLabel">0.88s</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // ---------- DOM ----------
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+
+      const pulseBadge = document.getElementById('pulseBadge');
+      const messageEl = document.getElementById('message');
+
+      const scoreLabel = document.getElementById('scoreLabel');
+      const hpLabel = document.getElementById('hpLabel');
+      const energyLabel = document.getElementById('energyLabel');
+      const comboLabel = document.getElementById('comboLabel');
+      const shieldSpdLabel = document.getElementById('shieldSpdLabel');
+      const spawnLabel = document.getElementById('spawnLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // ---------- Audio ----------
+      let soundOn = true;
+      let actx = null;
+      function audio(){ if(!soundOn) return null; if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+      function tone(f=440,d=.08,t='sine',g=.03,delay=0){
+        const c=audio(); if(!c) return;
+        const t0=c.currentTime+delay, o=c.createOscillator(), ga=c.createGain();
+        o.type=t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination); o.start(t0); o.stop(t0+d+0.02);
+      }
+      const sfx = {
+        rotate:()=>tone(320,.03,'triangle',.01),
+        block:(q=1)=>{ tone(500+q*50,.05,'sine',.028); tone(760+q*30,.07,'sine',.022,.04); },
+        hit:()=>{ tone(180,.1,'triangle',.04); tone(130,.13,'sine',.03,.06); },
+        pulse:()=>{ tone(420,.06,'triangle',.03); tone(660,.09,'sine',.03,.05); tone(920,.11,'sine',.025,.12); }
+      };
+
+      // ---------- Helpers ----------
+      const TAU = Math.PI*2;
+      const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+      const normAng = a => { a%=TAU; return a<0?a+TAU:a; };
+      const angDiff = (a,b)=>{
+        let d = normAng(a)-normAng(b);
+        if(d>Math.PI)d-=TAU;
+        if(d<-Math.PI)d+=TAU;
+        return d;
+      };
+
+      // ---------- World ----------
+      const W = canvas.width, H = canvas.height;
+      const CX = W*0.5, CY = H*0.54;
+
+      const st = {
+        running:true,
+        over:false,
+        time:0,
+
+        score:0,
+        hp:100,
+        energy:100,
+
+        combo:1,
+        comboTimer:0,
+
+        // shield
+        shieldAngle:0,
+        shieldArc:0.62,
+        shieldRadius:168,
+        shieldRotSpeed: 3.2,
+        shieldRotSpeedMin: 1.2,
+        shieldRotSpeedMax: 7.5,
+        shieldInertia:0,
+        shieldDrag:0.9,
+
+        // waves
+        enemies:[],
+        spawnT:0,
+        spawnEvery: 0.88,
+        spawnEveryMin: 0.22,
+        spawnEveryMax: 1.4,
+        spawnDecay: 0.012,
+        difficulty:1,
+
+        // FX
+        pulses:[],
+        sparks:[],
+
+        last:performance.now()
+      };
+
+      // ---------- Input ----------
+      const keys = new Set();
+      window.addEventListener('keydown', e=>{
+        const k=e.key.toLowerCase();
+
+        if(['arrowleft','arrowright','a','d',' ','shift','[',']','-','+','='].includes(k)) {
+          e.preventDefault();
+        }
+
+        // Ajuste rotación escudo
+        if(k === '['){
+          st.shieldRotSpeed = clamp(st.shieldRotSpeed - 0.2, st.shieldRotSpeedMin, st.shieldRotSpeedMax);
+          showMessage(`SHIELD SPD ${st.shieldRotSpeed.toFixed(1)}`, 420);
+        }
+        if(k === ']'){
+          st.shieldRotSpeed = clamp(st.shieldRotSpeed + 0.2, st.shieldRotSpeedMin, st.shieldRotSpeedMax);
+          showMessage(`SHIELD SPD ${st.shieldRotSpeed.toFixed(1)}`, 420);
+        }
+
+        // Ajuste frecuencia spawn (más enemigos = menor valor)
+        if(k === '-' || k === '_'){
+          st.spawnEveryMax = clamp(st.spawnEveryMax + 0.05, 0.35, 2.0);
+          showMessage(`SPAWN ${st.spawnEveryMax.toFixed(2)}s`, 420);
+        }
+        if(k === '+' || k === '=' ){
+          st.spawnEveryMax = clamp(st.spawnEveryMax - 0.05, 0.35, 2.0);
+          showMessage(`SPAWN ${st.spawnEveryMax.toFixed(2)}s`, 420);
+        }
+
+        keys.add(k);
+        if(k===' ') tryPulse();
+      });
+      window.addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+
+      // ---------- Enemy ----------
+      function spawnEnemy(){
+        const ang = Math.random()*TAU;
+        st.enemies.push({
+          ang,
+          r: 360 + Math.random()*180,
+          speed: 70 + Math.random()*36 + st.difficulty*8,
+          width: 8 + Math.random()*7,
+          near:false
+        });
+      }
+
+      // ---------- Pulse ----------
+      function tryPulse(){
+        if(!st.running || st.over) return;
+        if(st.energy < 26) return;
+
+        st.energy -= 26;
+
+        let best = null, bestD = 9999;
+        for(const e of st.enemies){
+          const radial = Math.abs(e.r - st.shieldRadius);
+          if(radial < bestD){ bestD = radial; best = e; }
+        }
+
+        let perfect = false;
+        if(best){
+          const inArc = Math.abs(angDiff(best.ang, st.shieldAngle)) <= st.shieldArc*0.5;
+          if(inArc && bestD <= 16) perfect = true;
+        }
+
+        st.pulses.push({
+          r: st.shieldRadius,
+          life: 0.62,
+          max: 0.62,
+          power: perfect ? 180 : 105
+        });
+
+        if(perfect){
+          pulseBadge.classList.add('on');
+          setTimeout(()=>pulseBadge.classList.remove('on'), 320);
+          st.combo = Math.min(9, st.combo+1);
+          st.comboTimer = 2.2;
+          st.score += 45 * st.combo;
+          sfx.pulse();
+          showMessage('PERFECT', 360);
+        }else{
+          st.combo = 1;
+          st.comboTimer = 0;
+          sfx.pulse();
+        }
+
+        updateHUD();
+      }
+
+      // ---------- Combat ----------
+      function blockCheck(enemy){
+        const inArc = Math.abs(angDiff(enemy.ang, st.shieldAngle)) <= st.shieldArc*0.5;
+        const radialHit = Math.abs(enemy.r - st.shieldRadius) <= 8;
+        return inArc && radialHit;
+      }
+
+      function enemyHitsCore(enemy){
+        return enemy.r <= 66;
+      }
+
+      function addSparks(ang, count=10){
+        const baseX = CX + Math.cos(ang)*st.shieldRadius;
+        const baseY = CY + Math.sin(ang)*st.shieldRadius;
+        for(let i=0;i<count;i++){
+          const a = ang + (Math.random()*0.9 - 0.45);
+          const sp = 90 + Math.random()*180;
+          st.sparks.push({
+            x:baseX,y:baseY,
+            vx:Math.cos(a)*sp,
+            vy:Math.sin(a)*sp,
+            life:.4 + Math.random()*.45,
+            max:.8
+          });
+        }
+      }
+
+      function updateEnemies(dt){
+        for(let i=st.enemies.length-1;i>=0;i--){
+          const e = st.enemies[i];
+          e.r -= e.speed * dt;
+
+          if(!e.near && e.r < st.shieldRadius + 24){
+            e.near = true;
+            sfx.rotate();
+          }
+
+          if(blockCheck(e)){
+            const precision = 1 - clamp(Math.abs(e.r - st.shieldRadius)/8,0,1);
+            const gain = Math.round((14 + precision*20) * st.combo);
+            st.score += gain;
+            st.energy = clamp(st.energy + 8 + precision*8, 0, 100);
+            st.comboTimer = 1.9;
+            st.combo = Math.min(9, st.combo+0.2);
+            addSparks(e.ang, 8);
+            sfx.block(precision);
+            st.enemies.splice(i,1);
+            continue;
+          }
+
+          if(enemyHitsCore(e)){
+            st.hp = Math.max(0, st.hp - 12);
+            st.combo = 1;
+            st.comboTimer = 0;
+            addSparks(e.ang, 14);
+            sfx.hit();
+            st.enemies.splice(i,1);
+            if(st.hp<=0){
+              st.over = true;
+              st.running = false;
+              stateLabel.textContent = 'Colapso';
+              showMessage('MONOLITH BREACHED', 1400);
+            }
+            continue;
+          }
+        }
+      }
+
+      function updatePulses(dt){
+        for(let i=st.pulses.length-1;i>=0;i--){
+          const p = st.pulses[i];
+          p.life -= dt;
+          p.r += dt * p.power;
+
+          for(let j=st.enemies.length-1;j>=0;j--){
+            const e = st.enemies[j];
+            if(Math.abs(e.r - p.r) < 12){
+              st.score += Math.round(10 * st.combo);
+              st.enemies.splice(j,1);
+              addSparks(e.ang, 6);
+            }
+          }
+
+          if(p.life<=0) st.pulses.splice(i,1);
+        }
+      }
+
+      function updateSparks(dt){
+        for(let i=st.sparks.length-1;i>=0;i--){
+          const s = st.sparks[i];
+          s.life -= dt;
+          s.x += s.vx*dt;
+          s.y += s.vy*dt;
+          s.vx *= 0.94;
+          s.vy *= 0.94;
+          if(s.life<=0) st.sparks.splice(i,1);
+        }
+      }
+
+      // ---------- Update ----------
+      function update(dt){
+        if(!st.running || st.over) return;
+
+        st.time += dt;
+        st.difficulty = 1 + st.time*0.06;
+
+        st.spawnEvery = clamp(
+          st.spawnEveryMax - st.time * st.spawnDecay,
+          st.spawnEveryMin,
+          st.spawnEveryMax
+        );
+
+        // shield control with inertia
+        let input = 0;
+        if(keys.has('arrowleft') || keys.has('a')) input -= 1;
+        if(keys.has('arrowright') || keys.has('d')) input += 1;
+
+        st.shieldInertia += input * st.shieldRotSpeed * dt;
+        st.shieldInertia *= Math.pow(st.shieldDrag, dt*10);
+        st.shieldAngle = normAng(st.shieldAngle + st.shieldInertia*dt*4.4);
+
+        st.energy = clamp(st.energy + dt*(5.2 + st.combo*0.5), 0, 100);
+
+        if(st.comboTimer>0){
+          st.comboTimer -= dt;
+          if(st.comboTimer<=0){
+            st.combo = 1;
+            st.comboTimer = 0;
+          }
+        }
+
+        st.spawnT += dt;
+        if(st.spawnT >= st.spawnEvery){
+          st.spawnT -= st.spawnEvery;
+          spawnEnemy();
+          if(Math.random() > 0.82) spawnEnemy();
+        }
+
+        updateEnemies(dt);
+        updatePulses(dt);
+        updateSparks(dt);
+
+        updateHUD();
+      }
+
+      // ---------- Draw ----------
+      function drawBackground(){
+        ctx.fillStyle = '#040404';
+        ctx.fillRect(0,0,W,H);
+
+        const g = ctx.createRadialGradient(CX,CY,120, CX,CY, H*0.72);
+        g.addColorStop(0,'rgba(255,255,255,0.03)');
+        g.addColorStop(1,'rgba(0,0,0,0.62)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0,0,W,H);
+
+        for(let i=0;i<6;i++){
+          const r = 120 + i*58 + Math.sin(st.time*0.4 + i)*2;
+          ctx.strokeStyle = `rgba(255,255,255,${0.04 + i*0.01})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(CX,CY,r,0,TAU);
+          ctx.stroke();
+        }
+      }
+
+      function drawMonolith(){
+        const w = 46, h = 132;
+
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(CX-w*0.46, CY+h*0.5+6, w*0.96, 6);
+
+        ctx.fillStyle = '#e8e8e8';
+        ctx.fillRect(CX-w*0.5, CY-h*0.5, w, h);
+
+        ctx.fillStyle = '#c4c4c4';
+        ctx.fillRect(CX+w*0.5, CY-h*0.5, 10, h);
+
+        ctx.fillStyle = '#a6a6a6';
+        ctx.fillRect(CX-w*0.5, CY+h*0.5, w+10, 10);
+
+        const hpGlow = (st.hp/100)*0.18;
+        ctx.strokeStyle = `rgba(255,255,255,${hpGlow})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(CX-w*0.62, CY-h*0.62, w*1.24, h*1.24);
+      }
+
+      function drawShield(){
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(CX,CY,st.shieldRadius,0,TAU);
+        ctx.stroke();
+
+        const a0 = st.shieldAngle - st.shieldArc*0.5;
+        const a1 = st.shieldAngle + st.shieldArc*0.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(CX,CY,st.shieldRadius,a0,a1);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 16;
+        ctx.beginPath();
+        ctx.arc(CX,CY,st.shieldRadius,a0,a1);
+        ctx.stroke();
+
+        const ex0 = CX + Math.cos(a0)*st.shieldRadius;
+        const ey0 = CY + Math.sin(a0)*st.shieldRadius;
+        const ex1 = CX + Math.cos(a1)*st.shieldRadius;
+        const ey1 = CY + Math.sin(a1)*st.shieldRadius;
+        ctx.fillStyle = '#f1f1f1';
+        ctx.beginPath(); ctx.arc(ex0,ey0,3.1,0,TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex1,ey1,3.1,0,TAU); ctx.fill();
+      }
+
+      function drawEnemies(){
+        for(const e of st.enemies){
+          const x = CX + Math.cos(e.ang)*e.r;
+          const y = CY + Math.sin(e.ang)*e.r;
+
+          const s = clamp(1.4 - e.r/420, 0.35, 1.4);
+          const w = e.width * s;
+          const h = e.width * 0.6 * s;
+
+          ctx.save();
+          ctx.translate(x,y);
+          ctx.rotate(e.ang + Math.PI*0.5);
+
+          ctx.fillStyle = 'rgba(230,230,230,0.92)';
+          ctx.fillRect(-w*0.5,-h*0.5,w,h);
+
+          ctx.fillStyle = 'rgba(185,185,185,0.9)';
+          ctx.fillRect(w*0.5,-h*0.5,5*s,h);
+
+          ctx.fillStyle = 'rgba(155,155,155,0.88)';
+          ctx.fillRect(-w*0.5,h*0.5,w+5*s,5*s);
+
+          ctx.restore();
+        }
+      }
+
+      function drawPulses(){
+        for(const p of st.pulses){
+          const a = clamp(p.life / p.max, 0, 1);
+          ctx.strokeStyle = `rgba(255,255,255,${0.32*a})`;
+          ctx.lineWidth = 2 + (1-a)*3;
+          ctx.beginPath();
+          ctx.arc(CX,CY,p.r,0,TAU);
+          ctx.stroke();
+        }
+      }
+
+      function drawSparks(){
+        for(const s of st.sparks){
+          const a = clamp(s.life / s.max, 0, 1);
+          ctx.fillStyle = `rgba(255,255,255,${a})`;
+          ctx.fillRect(s.x-2,s.y-2,4,4);
+        }
+      }
+
+      function drawEnergyRing(){
+        const arc = (st.energy/100) * TAU;
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(CX,CY,st.shieldRadius+34,0,TAU);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(CX,CY,st.shieldRadius+34,-Math.PI*0.5,-Math.PI*0.5+arc);
+        ctx.stroke();
+      }
+
+      function render(){
+        drawBackground();
+        drawEnergyRing();
+        drawMonolith();
+        drawShield();
+        drawEnemies();
+        drawPulses();
+        drawSparks();
+      }
+
+      // ---------- HUD ----------
+      function updateHUD(){
+        scoreLabel.textContent = Math.floor(st.score);
+        hpLabel.textContent = `${Math.max(0,Math.floor(st.hp))}%`;
+        energyLabel.textContent = `${Math.floor(st.energy)}%`;
+        comboLabel.textContent = `x${Math.floor(st.combo*10)/10}`;
+        shieldSpdLabel.textContent = st.shieldRotSpeed.toFixed(1);
+        spawnLabel.textContent = `${st.spawnEvery.toFixed(2)}s`;
+      }
+
+      function showMessage(txt, ms=800){
+        if(!txt){
+          messageEl.classList.remove('show');
+          messageEl.textContent='';
+          return;
+        }
+        messageEl.textContent = txt;
+        messageEl.classList.add('show');
+        clearTimeout(showMessage._t);
+        showMessage._t = setTimeout(()=>messageEl.classList.remove('show'), ms);
+      }
+
+      // ---------- Controls ----------
+      function togglePause(){
+        if(st.over) return;
+        st.running = !st.running;
+        pauseBtn.textContent = st.running ? 'Pause' : 'Resume';
+        stateLabel.textContent = st.running ? 'Activo' : 'Pausado';
+      }
+
+      function reset(){
+        st.running = true;
+        st.over = false;
+        st.time = 0;
+        st.score = 0;
+        st.hp = 100;
+        st.energy = 100;
+        st.combo = 1;
+        st.comboTimer = 0;
+
+        st.shieldAngle = 0;
+        st.shieldInertia = 0;
+        st.shieldRotSpeed = 3.2;
+
+        st.enemies = [];
+        st.spawnT = 0;
+        st.spawnEvery = 0.88;
+        st.spawnEveryMin = 0.22;
+        st.spawnEveryMax = 1.4;
+        st.spawnDecay = 0.012;
+        st.difficulty = 1;
+
+        st.pulses = [];
+        st.sparks = [];
+
+        stateLabel.textContent = 'Activo';
+        pauseBtn.textContent = 'Pause';
+        showMessage('', 10);
+        updateHUD();
+      }
+
+      // ---------- Loop ----------
+      function loop(now){
+        const dt = Math.min(0.05, (now - st.last)/1000);
+        st.last = now;
+
+        update(dt);
+        render();
+
+        requestAnimationFrame(loop);
+      }
+
+      // ---------- Buttons ----------
+      soundBtn.addEventListener('click', ()=>{
+        soundOn = !soundOn;
+        soundBtn.textContent = `Sound: ${soundOn ? 'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', reset);
+
+      // ---------- Start ----------
+      reset();
+      st.last = performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

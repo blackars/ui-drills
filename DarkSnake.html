@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cube Snake // Fold Grid</title>
+  <style>
+    :root{
+      --bg:#030303;
+      --fg:#f2f2f2;
+      --muted:#8b8b8b;
+      --line:rgba(255,255,255,.14);
+      --line-soft:rgba(255,255,255,.08);
+      --ease:cubic-bezier(.2,.8,.2,1);
+
+      --grid:16;
+      --cell:30px;
+      --board:calc(var(--grid) * var(--cell));
+
+      --t-fast:170ms;
+      --t-med:420ms;
+      --t-slow:900ms;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{
+      width:100%;height:100%;overflow:hidden;
+      background:var(--bg);color:var(--fg);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+    }
+
+    body{
+      background:
+        radial-gradient(circle at 50% -20%, rgba(255,255,255,.08), transparent 44%),
+        linear-gradient(180deg,#070707,#020202);
+    }
+
+    .app{
+      width:100%;height:100%;
+      display:grid;grid-template-rows:auto 1fr auto;
+      gap:10px;padding:clamp(8px,1.8vw,16px);
+    }
+
+    .top{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
+    }
+    .title{display:grid;gap:4px}
+    .eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+    h1{font-size:clamp(18px,3.8vw,38px);line-height:.9;letter-spacing:-.05em;font-weight:620}
+    .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#d7d7d7}
+
+    .stage{
+      min-height:0;
+      display:grid;place-items:center;
+      perspective:1200px;
+    }
+
+    .board-wrap{
+      width:var(--board);
+      height:var(--board);
+      transform-style:preserve-3d;
+      transition:transform var(--t-slow) var(--ease);
+      position:relative;
+    }
+
+    .board{
+      position:absolute;inset:0;
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.01);
+      overflow:hidden;
+      transform-style:preserve-3d;
+    }
+
+    .gridHint{
+      position:absolute;inset:0;pointer-events:none;opacity:.08;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px);
+      background-size:var(--cell) var(--cell);
+    }
+
+    .entity-layer{
+      position:absolute;inset:0;
+      transform-style:preserve-3d;
+    }
+
+    /* Cubo flat 3D (top + side shades) */
+    .cube{
+      position:absolute;
+      width:calc(var(--cell) * .82);
+      height:calc(var(--cell) * .82);
+      transform:translate3d(-50%,-50%,0);
+      transform-style:preserve-3d;
+      pointer-events:none;
+      will-change:left,top,transform,opacity;
+    }
+
+    .cube .top, .cube .side-r, .cube .side-b{
+      position:absolute;
+      inset:0;
+    }
+
+    .cube .top{
+      background:linear-gradient(180deg,#ececec,#cecece);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.08) inset,
+        0 0 10px rgba(255,255,255,.08);
+      transform:translateZ(0px);
+    }
+
+    .cube .side-r{
+      width:22%;
+      left:auto; right:-22%;
+      background:linear-gradient(180deg,#b5b5b5,#8f8f8f);
+      transform-origin:left center;
+      transform:skewY(0deg);
+      opacity:.9;
+    }
+
+    .cube .side-b{
+      height:22%;
+      top:auto; bottom:-22%;
+      background:linear-gradient(90deg,#8f8f8f,#7b7b7b);
+      opacity:.85;
+    }
+
+    .cube.head .top{
+      background:linear-gradient(180deg,#ffffff,#d8d8d8);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.14) inset,
+        0 0 16px rgba(255,255,255,.16);
+    }
+
+    .food .top{
+      background:linear-gradient(180deg,#fff,#f0f0f0);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.2) inset,
+        0 0 18px rgba(255,255,255,.28);
+      animation:foodPulse 1s ease-in-out infinite;
+    }
+    .food .side-r{background:linear-gradient(180deg,#dfdfdf,#bfbfbf)}
+    .food .side-b{background:linear-gradient(90deg,#bfbfbf,#a8a8a8)}
+
+    .fold-flash{
+      position:absolute;inset:0;pointer-events:none;opacity:0;
+      background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.14) 49%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.14) 51%, transparent 100%);
+      transform:translateX(-120%);
+      mix-blend-mode:screen;
+    }
+    .fold-flash.play{animation:foldSweep 850ms var(--ease) forwards}
+
+    .badge{
+      position:absolute;left:10px;top:10px;z-index:6;
+      font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+      color:#050505;background:#f1f1f1;padding:6px 8px;
+      opacity:0;transform:translateY(-4px);
+      transition:opacity 140ms var(--ease), transform 140ms var(--ease);
+    }
+    .badge.on{opacity:1;transform:translateY(0)}
+
+    .message{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      font-size:clamp(14px,2vw,22px);letter-spacing:.2em;text-transform:uppercase;
+      opacity:0;transition:opacity var(--t-med) var(--ease);
+      text-shadow:0 0 16px rgba(255,255,255,.24);
+      z-index:7;
+      pointer-events:none;
+    }
+    .message.show{opacity:1}
+
+    .particle{
+      position:absolute;
+      width:8px;height:8px;
+      background:#dcdcdc;
+      box-shadow:0 0 10px rgba(255,255,255,.16);
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      opacity:1;
+    }
+
+    .bottom{display:grid;gap:7px}
+    .status{
+      display:flex;gap:10px;flex-wrap:wrap;
+      font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#d9d9d9;
+    }
+    .status span{color:var(--muted)}
+    .status b{color:#fff;font-weight:560}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid var(--line-soft);background:transparent;color:#efefef;
+      padding:8px 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+      transition:all 170ms var(--ease);
+    }
+    button:hover{border-color:var(--line);background:rgba(255,255,255,.05)}
+    .active{background:#efefef;color:#050505;border-color:#efefef}
+
+    @keyframes foodPulse{
+      0%,100%{transform:translateZ(0) scale(1)}
+      50%{transform:translateZ(0) scale(1.08)}
+    }
+    @keyframes foldSweep{
+      0%{transform:translateX(-120%);opacity:0}
+      25%{opacity:.8}
+      100%{transform:translateX(120%);opacity:0}
+    }
+
+    @media (max-width:980px){
+      :root{ --cell:min(4.8vw,24px); --grid:14; }
+      .top{display:grid}
+      .meta{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="title">
+        <div class="eyebrow">Cube Snake · Fold Grid</div>
+        <h1>Snake</h1>
+      </div>
+      <div class="meta">
+        <span>flat 3D cubes</span><span>·</span>
+        <span>smooth interpolation</span><span>·</span>
+        <span>board folding</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <div class="board-wrap" id="boardWrap">
+        <div class="board" id="board">
+          <div class="gridHint"></div>
+          <div class="entity-layer" id="entityLayer"></div>
+          <div class="fold-flash" id="foldFlash"></div>
+          <div class="badge" id="foldBadge">FOLD GRID</div>
+          <div class="message" id="message"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="bottom">
+      <div class="status">
+        <div><span>Puntaje:</span> <b id="scoreLabel">0</b></div>
+        <div><span>Longitud:</span> <b id="lenLabel">3</b></div>
+        <div><span>Fold en:</span> <b id="foldTimerLabel">18</b></div>
+        <div><span>Estado:</span> <b id="stateLabel">Activo</b></div>
+      </div>
+      <div class="controls">
+        <button id="soundBtn" class="active">Sound: On</button>
+        <button id="foldBtn">Fold now</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      // CONFIG
+      const GRID = 16;
+      const CELL = 30; // visual only base for positioning
+      const STEP_TIME = 0.11; // sec per cell
+      const FOLD_EVERY = 18;  // seconds
+      const FOLD_ANIM = 0.9;  // seconds
+
+      // DOM
+      const boardWrap = document.getElementById('boardWrap');
+      const entityLayer = document.getElementById('entityLayer');
+      const foldFlash = document.getElementById('foldFlash');
+      const foldBadge = document.getElementById('foldBadge');
+      const messageEl = document.getElementById('message');
+
+      const scoreLabel = document.getElementById('scoreLabel');
+      const lenLabel = document.getElementById('lenLabel');
+      const foldTimerLabel = document.getElementById('foldTimerLabel');
+      const stateLabel = document.getElementById('stateLabel');
+
+      const soundBtn = document.getElementById('soundBtn');
+      const foldBtn = document.getElementById('foldBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // AUDIO
+      let ctx = null, soundOn = true;
+      function audio(){ if(!soundOn) return null; if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+      function tone(f=440,d=.08,t='sine',g=.03,delay=0){
+        const c=audio(); if(!c) return;
+        const t0=c.currentTime+delay, o=c.createOscillator(), ga=c.createGain();
+        o.type=t; o.frequency.setValueAtTime(f,t0);
+        ga.gain.setValueAtTime(0.0001,t0);
+        ga.gain.exponentialRampToValueAtTime(g,t0+0.01);
+        ga.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+        o.connect(ga).connect(c.destination); o.start(t0); o.stop(t0+d+0.02);
+      }
+      const sfx = {
+        step(){ tone(350,.04,'triangle',.014); },
+        eat(){ tone(540,.06,'sine',.03); tone(760,.08,'sine',.026,.05); },
+        fold(){ tone(300,.08,'triangle',.03); tone(520,.1,'sine',.03,.08); tone(740,.12,'sine',.028,.16); },
+        dead(){ tone(220,.1,'triangle',.03); tone(160,.13,'sine',.03,.08); tone(120,.15,'sine',.03,.16); }
+      };
+
+      // STATE
+      const st = {
+        running:true, over:false,
+        score:0,
+        foldTimer:FOLD_EVERY,
+        foldCount:0, // 0..3 (rotations)
+        folding:false,
+        foldAnimLeft:0,
+
+        snake:[{x:7,y:8},{x:6,y:8},{x:5,y:8}],
+        dir:{x:1,y:0},
+        nextDir:{x:1,y:0},
+
+        moving:false,
+        moveT:0,
+        prevSnake:[],
+        grow:0,
+
+        food:{x:11,y:8},
+
+        cubes:[],
+        foodCube:null,
+
+        particles:[],
+
+        last:performance.now()
+      };
+
+      const key = (x,y)=>`${x},${y}`;
+      const inBounds = (x,y)=>x>=0&&y>=0&&x<GRID&&y<GRID;
+      const same = (a,b)=>a.x===b.x&&a.y===b.y;
+
+      // INIT
+      function createCube(className=''){
+        const cube = document.createElement('div');
+        cube.className = `cube ${className}`.trim();
+        cube.innerHTML = `<div class="top"></div><div class="side-r"></div><div class="side-b"></div>`;
+        entityLayer.appendChild(cube);
+        return cube;
+      }
+
+      function resetVisuals(){
+        entityLayer.innerHTML = '';
+        st.cubes = [];
+        for(let i=0;i<st.snake.length;i++){
+          st.cubes.push(createCube(i===0 ? 'head' : ''));
+        }
+        st.foodCube = createCube('food');
+        placeCube(st.foodCube, st.food.x, st.food.y, false);
+      }
+
+      function placeCube(el, x, y, center=true){
+        const px = x*CELL + CELL/2;
+        const py = y*CELL + CELL/2;
+        el.style.left = `${px}px`;
+        el.style.top = `${py}px`;
+      }
+
+      function renderSnakeInterpolated(alpha){
+        // alpha 0..1 from prevSnake to snake
+        for(let i=0;i<st.snake.length;i++){
+          const cur = st.snake[i];
+          const prev = st.prevSnake[i] || cur;
+          const ix = prev.x + (cur.x - prev.x) * alpha;
+          const iy = prev.y + (cur.y - prev.y) * alpha;
+
+          const cube = st.cubes[i];
+          if(!cube) continue;
+          cube.classList.toggle('head', i===0);
+          cube.style.left = `${ix*CELL + CELL/2}px`;
+          cube.style.top = `${iy*CELL + CELL/2}px`;
+        }
+      }
+
+      function spawnFood(){
+        const occ = new Set(st.snake.map(s=>key(s.x,s.y)));
+        let x,y;
+        do{
+          x = (Math.random()*GRID)|0;
+          y = (Math.random()*GRID)|0;
+        }while(occ.has(key(x,y)));
+        st.food = {x,y};
+        placeCube(st.foodCube, x,y);
+      }
+
+      // INPUT
+      const keys = new Set();
+      window.addEventListener('keydown', e=>{
+        const k = e.key.toLowerCase();
+        if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k)) e.preventDefault();
+        if(k===' ') togglePause();
+        keys.add(k);
+      });
+      window.addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
+
+      function readDirInput(){
+        let d = st.nextDir;
+        if(keys.has('arrowup')||keys.has('w')) d={x:0,y:-1};
+        else if(keys.has('arrowdown')||keys.has('s')) d={x:0,y:1};
+        else if(keys.has('arrowleft')||keys.has('a')) d={x:-1,y:0};
+        else if(keys.has('arrowright')||keys.has('d')) d={x:1,y:0};
+
+        // no reversa directa
+        if(d.x === -st.dir.x && d.y === -st.dir.y) return;
+        st.nextDir = d;
+      }
+
+      // FOLD GRID
+      function rotateDirClockwise90(d){ return {x:-d.y, y:d.x}; } // visual clockwise
+      function doFold(){
+        if(st.over) return;
+        st.folding = true;
+        st.foldAnimLeft = FOLD_ANIM;
+        st.foldCount = (st.foldCount + 1) % 4;
+
+        // rota tablero
+        boardWrap.style.transform = `rotateZ(${st.foldCount*90}deg)`;
+
+        // remapea dirección relativa
+        st.dir = rotateDirClockwise90(st.dir);
+        st.nextDir = rotateDirClockwise90(st.nextDir);
+
+        foldFlash.classList.remove('play'); void foldFlash.offsetWidth; foldFlash.classList.add('play');
+        foldBadge.classList.add('on');
+        setTimeout(()=>foldBadge.classList.remove('on'), 680);
+
+        sfx.fold();
+      }
+
+      // MOVE / COLLISION
+      function stepSnake(){
+        st.prevSnake = st.snake.map(p=>({x:p.x,y:p.y}));
+        st.dir = {x:st.nextDir.x, y:st.nextDir.y};
+
+        const head = st.snake[0];
+        const nh = {x:head.x + st.dir.x, y:head.y + st.dir.y};
+
+        // choque paredes
+        if(!inBounds(nh.x, nh.y)){
+          die();
+          return;
+        }
+
+        // choque cuerpo
+        for(let i=0;i<st.snake.length;i++){
+          if(st.snake[i].x===nh.x && st.snake[i].y===nh.y){
+            die();
+            return;
+          }
+        }
+
+        st.snake.unshift(nh);
+
+        if(same(nh, st.food)){
+          st.score += 10;
+          st.grow += 1;
+          sfx.eat();
+          spawnFood();
+        }
+
+        if(st.grow>0){
+          st.grow--;
+        }else{
+          st.snake.pop();
+        }
+
+        // sync cube pool
+        while(st.cubes.length < st.snake.length){
+          st.cubes.push(createCube(''));
+        }
+        while(st.cubes.length > st.snake.length){
+          const c = st.cubes.pop();
+          c.remove();
+        }
+
+        sfx.step();
+      }
+
+      // DEATH FX
+      function spawnDeathParticles(){
+        const head = st.snake[0];
+        const ox = head.x*CELL + CELL/2;
+        const oy = head.y*CELL + CELL/2;
+
+        for(let i=0;i<48;i++){
+          const p = document.createElement('div');
+          p.className = 'particle';
+          p.style.left = `${ox}px`;
+          p.style.top = `${oy}px`;
+          entityLayer.appendChild(p);
+
+          const a = Math.random()*Math.PI*2;
+          const sp = 60 + Math.random()*180;
+          const vx = Math.cos(a)*sp;
+          const vy = Math.sin(a)*sp;
+          const life = .45 + Math.random()*.5;
+          const size = 4 + Math.random()*7;
+          p.style.width = `${size}px`;
+          p.style.height = `${size}px`;
+
+          st.particles.push({el:p,x:ox,y:oy,vx,vy,life,max:life});
+        }
+      }
+
+      function updateParticles(dt){
+        for(let i=st.particles.length-1;i>=0;i--){
+          const p = st.particles[i];
+          p.life -= dt;
+          p.x += p.vx*dt;
+          p.y += p.vy*dt;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+
+          const t = Math.max(0, p.life/p.max);
+          p.el.style.left = `${p.x}px`;
+          p.el.style.top = `${p.y}px`;
+          p.el.style.opacity = `${t}`;
+          p.el.style.transform = `translate(-50%,-50%) scale(${0.6 + t*0.8})`;
+
+          if(p.life<=0){
+            p.el.remove();
+            st.particles.splice(i,1);
+          }
+        }
+      }
+
+      function die(){
+        if(st.over) return;
+        st.over = true;
+        st.running = false;
+        stateLabel.textContent = 'Colisión';
+        setMessage('Fragmented', true);
+        spawnDeathParticles();
+        sfx.dead();
+      }
+
+      // UI
+      function setMessage(txt, show=true){
+        messageEl.textContent = txt;
+        messageEl.classList.toggle('show', show);
+      }
+
+      function updateHUD(){
+        scoreLabel.textContent = st.score;
+        lenLabel.textContent = st.snake.length;
+        foldTimerLabel.textContent = Math.ceil(st.foldTimer);
+      }
+
+      function togglePause(){
+        if(st.over) return;
+        st.running = !st.running;
+        pauseBtn.textContent = st.running ? 'Pause' : 'Resume';
+        stateLabel.textContent = st.running ? 'Activo' : 'Pausado';
+      }
+
+      function reset(){
+        st.running = true;
+        st.over = false;
+        st.score = 0;
+        st.foldTimer = FOLD_EVERY;
+        st.foldCount = 0;
+        st.folding = false;
+        st.foldAnimLeft = 0;
+
+        st.snake = [{x:7,y:8},{x:6,y:8},{x:5,y:8}];
+        st.dir = {x:1,y:0};
+        st.nextDir = {x:1,y:0};
+        st.moving = false;
+        st.moveT = 0;
+        st.prevSnake = st.snake.map(p=>({x:p.x,y:p.y}));
+        st.grow = 0;
+        st.food = {x:11,y:8};
+
+        st.particles.forEach(p=>p.el.remove());
+        st.particles = [];
+
+        boardWrap.style.transform = 'rotateZ(0deg)';
+        setMessage('', false);
+        stateLabel.textContent = 'Activo';
+        pauseBtn.textContent = 'Pause';
+
+        resetVisuals();
+        spawnFood();
+        updateHUD();
+      }
+
+      // LOOP
+      function loop(now){
+        const dt = Math.min(0.05, (now - st.last)/1000);
+        st.last = now;
+
+        readDirInput();
+
+        if(st.running && !st.over){
+          // fold timer
+          st.foldTimer -= dt;
+          if(st.foldTimer <= 0){
+            st.foldTimer = FOLD_EVERY;
+            doFold();
+          }
+
+          // snake step timing
+          st.moveT += dt;
+          let stepped = false;
+          while(st.moveT >= STEP_TIME && !st.over){
+            st.moveT -= STEP_TIME;
+            stepSnake();
+            stepped = true;
+          }
+
+          // interpolation alpha
+          const alpha = Math.min(1, st.moveT / STEP_TIME);
+          renderSnakeInterpolated(alpha);
+          placeCube(st.foodCube, st.food.x, st.food.y);
+
+          updateHUD();
+        } else {
+          // if over, keep last state but update particles
+          renderSnakeInterpolated(1);
+        }
+
+        updateParticles(dt);
+
+        requestAnimationFrame(loop);
+      }
+
+      // CONTROLS
+      soundBtn.addEventListener('click', ()=>{
+        soundOn = !soundOn;
+        soundBtn.textContent = `Sound: ${soundOn?'On':'Off'}`;
+        soundBtn.classList.toggle('active', soundOn);
+        if(soundOn) audio();
+      });
+
+      foldBtn.addEventListener('click', ()=>{
+        if(st.over) return;
+        st.foldTimer = FOLD_EVERY;
+        doFold();
+      });
+
+      pauseBtn.addEventListener('click', togglePause);
+      resetBtn.addEventListener('click', reset);
+
+      // BOOT
+      reset();
+      st.last = performance.now();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
