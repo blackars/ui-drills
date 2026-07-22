@@ -138,27 +138,43 @@ Each module gets tags displayed as small badges inside its card.
 - [x] Create `dev_diary.md`
 
 ### Phase 1: Restructure Directories
-- [ ] Create `games/` and `experiences/` directories
-- [ ] Move and rename all files with URL-safe names
-- [ ] Move MINIJUEGOS contents into `games/`
+- [x] Create `games/` and `experiences/` directories
+- [x] Move and rename all files with URL-safe names
+- [x] Move MINIJUEGOS contents into `games/`
 
 ### Phase 2: Hub Overhaul
-- [ ] Rename `hub.html` → `index.html`
-- [ ] Add all 21+ modules to GAMES array
-- [ ] Implement tag system (badges on cards)
-- [ ] Update all routes to new paths
+- [x] Rename `hub.html` → `index.html`
+- [x] Add all 21+ modules to GAMES array
+- [x] Implement tag system (badges on cards)
+- [x] Update all routes to new paths
 
 ### Phase 3: Technical Fixes
-- [ ] Fix missing DOCTYPE in spiral1, spiral2, truecircletypography
-- [ ] Fix ASCII Art placeholder URL (use generative canvas)
-- [ ] Clean CODVERTER.COM references
-- [ ] Verify all files load correctly
+- [x] Fix missing DOCTYPE in spiral1, spiral2, truecircletypography
+- [x] Fix ASCII Art placeholder URL (use generative canvas)
+- [x] Clean CODVERTER.COM references
+- [x] Verify all files load correctly
 
 ### Phase 4: README + Deploy
-- [ ] Create public README.md
-- [ ] Force push to GitHub
-- [ ] Activate GitHub Pages
-- [ ] Verify deployment
+- [x] Create public README.md
+- [x] Force push to GitHub
+- [x] Activate GitHub Pages
+- [x] Verify deployment
+
+### Phase 5: Polish — Audio Engine + Favicon + Animations
+- [x] Generated `favicon.ico` (16x16 + 32x32 icosahedron)
+- [x] Generated `favicon.svg` (icosahedron wireframe)
+- [x] Generated `ambient-loop.mp3` (8s sci-fi drone, 96KB)
+- [x] Added favicon `<link>` tags to hub `<head>`
+- [x] Added `@keyframes fadeSlideUp` description animation + hover glow
+- [x] Added AudioEngine class (Web Audio API)
+  - Hover click: oscillator sweep 880→1320 Hz
+  - Click: noise burst + sine 220→660 Hz
+  - Filter click: triangle 440→660 Hz
+  - Open module: sine sweep 330→1760 Hz
+- [x] Added ambient music player (`ambient-loop.mp3`, `loop=true`, vol 0.12)
+- [x] First-interaction unlock (click/touch/keydown triggers AudioContext + ambient)
+- [x] Mute/volume toggle button in topbar (localStorage persistence)
+- [x] Sound effects on card hover, card click, filter click
 
 ---
 
@@ -178,6 +194,17 @@ Each module gets tags displayed as small badges inside its card.
 ---
 
 ## Changelog
+
+### 2026-07-22 — Audio Engine + Favicon + Animations
+- Generated icosahedron favicon (`.ico` + `.svg`)
+- Generated ambient sci-fi drone loop (`ambient-loop.mp3`, 8s, 96KB)
+- Added favicon links to hub `<head>`
+- Added `@keyframes fadeSlideUp` description animation + hover text-shadow glow
+- Built `AudioEngine` class (Web Audio API oscillators + ambient music)
+- Sound effects: hover click, open module sweep, filter click, noise burst on card click
+- Ambient music starts on first user interaction (browser autoplay policy)
+- Mute/volume button in topbar with `localStorage` persistence
+- Updated `dev_diary.md` with Phase 5 completion
 
 ### 2026-07-21 — Initial Restructure
 - Analyzed full repository (21+ experiences, hub, docs)

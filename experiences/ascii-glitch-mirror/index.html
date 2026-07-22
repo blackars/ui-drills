@@ -116,8 +116,8 @@
 <body>
 <div id="app">
   <div class="top">
-    <button class="chip active" id="modeWebcam">cam</button>
-    <button class="chip" id="modeMouse">mouse</button>
+    <button class="chip" id="modeWebcam">cam</button>
+    <button class="chip active" id="modeMouse">mouse</button>
     <button class="chip" id="modeImg">img</button>
     <input id="imgInput" class="hidden" type="file" accept="image/*" />
     <div class="sp"></div>
@@ -165,7 +165,7 @@
   const viewport = document.getElementById('viewport');
 
   const CHARS = " .:-=+*#%@";
-  let mode = 'webcam';
+  let mode = 'mouse';
   let stream = null;
   let loadedImage = null;
   let glitchPower = 0;
@@ -367,7 +367,6 @@
 
   (async function init(){
     resizeGrid();
-    await startWebcam();
     requestAnimationFrame(frame);
   })();
 })();
