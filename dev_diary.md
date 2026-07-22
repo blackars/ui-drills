@@ -176,6 +176,17 @@ Each module gets tags displayed as small badges inside its card.
 - [x] Mute/volume toggle button in topbar (localStorage persistence)
 - [x] Sound effects on card hover, card click, filter click
 
+### Phase 6: Typewriter Effect — Hero Description
+- [x] Replaced sans-serif font with monospace (`SF Mono` / `Cascadia Code` / `Fira Code` / `Consolas`)
+- [x] Removed `fadeSlideUp` animation, replaced with typewriter character-by-character reveal
+- [x] Added blinking cursor `█` via `::after` pseudo-element + `@keyframes blink` (0.6s step-end)
+- [x] Cursor auto-hides via `.done` class when typing completes
+- [x] HTML-aware typewriter: `<strong>` tags insert instantly (not typed char-by-char)
+- [x] Natural micro-delays: +80ms at periods, +40ms at commas, -10ms at spaces
+- [x] Typing speed: ~38ms/char (~11s total for full description)
+- [x] 600ms initial delay before typing starts for page load
+- [x] `min-height: 5.5em` prevents layout shift during typing
+
 ---
 
 ## Post-MVP Roadmap (Future Phases)
@@ -195,7 +206,16 @@ Each module gets tags displayed as small badges inside its card.
 
 ## Changelog
 
-### 2026-07-22 — Audio Engine + Favicon + Animations
+### 2026-07-22 (v2) — Typewriter Effect on Hero Description
+- Replaced hero description font with monospace console style
+- Added typewriter effect: text reveals character-by-character at 38ms/char
+- Added blinking `█` cursor via CSS `::after` + `@keyframes blink`
+- HTML-aware: `<strong>` tags insert instantly, not typed individually
+- Natural rhythm: micro-delays at punctuation (periods, commas)
+- Cursor auto-hides after typing completes (`.done` class)
+- Prevented layout shift with `min-height: 5.5em`
+
+### 2026-07-22 (v1) — Audio Engine + Favicon + Animations
 - Generated icosahedron favicon (`.ico` + `.svg`)
 - Generated ambient sci-fi drone loop (`ambient-loop.mp3`, 8s, 96KB)
 - Added favicon links to hub `<head>`
