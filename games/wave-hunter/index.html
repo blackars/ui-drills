@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Capturador de Ondas – 3 Lanes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        background: #050505;
+        color: #fff;
+        font-family: 'Space Mono','IBM Plex Mono',monospace;
+        overflow: hidden;
+        touch-action: none;
+    }
+    canvas { width: 100vw; height: 100vh; display: block; }
+    .ui-panel {
+        position: fixed;
+        top: 20px; left: 20px;
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 14px 18px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(5,5,5,0.65);
+        backdrop-filter: blur(8px);
+        border-radius: 10px;
+        min-width: 220px;
+        z-index: 10;
+    }
+    .stat { display: flex; justify-content: space-between; font-size: 0.9rem; }
+    .energy-bar, .intensity-meter {
+        width: 100%; border-radius: 999px; overflow: hidden;
+        background: rgba(255,255,255,0.2);
+    }
+    .energy-bar { height: 8px; }
+    .intensity-meter { height: 4px; margin-top: 4px; }
+    .energy-bar-fill {
+        height: 100%; width: 100%;
+        background: linear-gradient(90deg,#00f5c4,#f0f0f0);
+        transition: width 0.15s;
+    }
+    .intensity-meter-fill {
+        height: 100%; width: 0%;
+        background: linear-gradient(90deg,#fff,#777);
+        transition: width 0.08s;
+    }
+    .controls-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    button, label.file-btn {
+        border: 1px solid rgba(255,255,255,0.35);
+        background: rgba(255,255,255,0.08);
+        color: #fff;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.2s, border 0.2s;
+    }
+    button:hover, label.file-btn:hover {
+        background: rgba(255,255,255,0.15);
+        border-color: rgba(255,255,255,0.7);
+    }
+    label.file-btn input { display: none; }
+    .modal {
+        position: fixed; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px; background: rgba(0,0,0,0.9);
+        transition: opacity 0.3s ease; z-index: 20;
+    }
+    .modal.hidden { opacity: 0; pointer-events: none; }
+    .modal-content {
+        max-width: 480px; width: 100%;
+        border: 1px solid rgba(255,255,255,0.2);
+        background: rgba(8,8,8,0.85);
+        padding: 28px;
+        border-radius: 16px;
+        text-align: center;
+    }
+    .modal-content h1 { margin-top: 0; font-size: 2rem; }
+    .modal-content p { color: #bbb; font-size: 0.95rem; }
+    .modal-content ul {
+        text-align: left;
+        padding-left: 18px;
+        color: #bbb;
+        font-size: 0.9rem;
+    }
+    #credits {
+        position: fixed;
+        right: 20px; bottom: 14px;
+        color: rgba(255,255,255,0.4);
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        z-index: 5;
+    }
+    .pad-row {
+        position: fixed;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 14px;
+        z-index: 9;
+    }
+    .lane-pad {
+        width: 84px; height: 84px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.08);
+        color: #fff;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        font-size: 1rem; gap: 4px;
+        touch-action: none;
+        transition: border 0.2s, background 0.2s;
+    }
+    .lane-pad .shape-symbol { font-size: 1.4rem; letter-spacing: 0.05em; }
+    .lane-pad .key-label { font-size: 0.8rem; color: rgba(255,255,255,0.7); }
+    .lane-pad.active {
+        border-color: rgba(255,255,255,0.9);
+        background: rgba(255,255,255,0.2);
+    }
+    @media (max-width: 640px) {
+        .ui-panel { top: 12px; left: 12px; right: 12px; }
+        .modal-content { padding: 22px; }
+        .lane-pad { width: 70px; height: 70px; border-radius: 16px; }
+    }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div class="ui-panel" id="hud">
+    <div class="stat"><span>Puntuación</span><strong id="scoreValue">0</strong></div>
+    <div class="stat"><span>Combo</span><span id="comboValue">0</span></div>
+    <div class="stat"><span>Energía</span><span id="energyLabel">100%</span></div>
+    <div class="energy-bar"><div class="energy-bar-fill" id="energyFill"></div></div>
+    <div class="stat"><span>Intensidad</span><span id="intensityValue">0%</span></div>
+    <div class="intensity-meter"><div class="intensity-meter-fill" id="intensityFill"></div></div>
+    <div class="stat"><span>Audio</span><span id="audioStatus">Auto</span></div>
+    <div class="controls-row">
+        <button id="startButton">Iniciar / Reiniciar</button>
+        <button id="restartButton">Reintentar</button>
+    </div>
+    <div class="controls-row">
+        <label class="file-btn">Cargar audio<input type="file" accept="audio/*" id="audioInput"></label>
+        <button id="placeholderButton">Placeholder</button>
+    </div>
+</div>
+
+<div class="pad-row">
+    <button class="lane-pad" data-lane="0">
+        <span class="shape-symbol">■</span>
+        <span class="key-label">← / A</span>
+    </button>
+    <button class="lane-pad" data-lane="1">
+        <span class="shape-symbol">●</span>
+        <span class="key-label">↑ / W</span>
+    </button>
+    <button class="lane-pad" data-lane="2">
+        <span class="shape-symbol">▲</span>
+        <span class="key-label">→ / D</span>
+    </button>
+</div>
+
+<div id="startScreen" class="modal">
+    <div class="modal-content">
+        <h1>Capturador de Ondas</h1>
+        <p>Pulsa la tecla (o pad) del carril correcto cuando la figura toque la línea.</p>
+        <ul>
+            <li>PC: ← / ↑ / → o A / W / D.</li>
+            <li>Móvil: pads inferiores.</li>
+            <li>Carga una canción o usa el modo automático.</li>
+        </ul>
+        <div class="controls-row">
+            <button id="startGameBtn">Comenzar</button>
+            <label class="file-btn">Cargar audio<input type="file" accept="audio/*" id="audioInputStart"></label>
+            <button id="placeholderButtonStart">Placeholder</button>
+        </div>
+    </div>
+</div>
+
+<div id="gameOverScreen" class="modal hidden">
+    <div class="modal-content">
+        <h1>Fin de la partida</h1>
+        <p>Tu puntaje: <strong id="finalScore">0</strong></p>
+        <div class="controls-row">
+            <button id="playAgainBtn">Reintentar</button>
+            <button id="backToMenuBtn">Volver al inicio</button>
+        </div>
+    </div>
+</div>
+
+<div id="credits">Capturador de Ondas — 3 lanes</div>
+
+<script>
+const PLACEHOLDER_AUDIO_URL = "";
+
+const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+const randRange = (min,max)=>Math.random()*(max-min)+min;
+
+const KEY_TO_LANE = {
+    "ArrowLeft":0,"a":0,"A":0,
+    "ArrowUp":1,"w":1,"W":1,
+    "ArrowRight":2,"d":2,"D":2
+};
+const LANE_SYMBOLS = ["■","●","▲"];
+const LANE_TYPES = ["square","circle","triangle"];
+const RATING_POINTS = { Perfect: 160, Great: 130, Good: 100 };
+const RATING_ENERGY = { Perfect: 7, Great: 5, Good: 4 };
+
+/* Partículas */
+class Particle {
+    constructor(x,y,color="255,255,255"){
+        this.x=x; this.y=y; this.life=1;
+        this.speedX=randRange(-50,50);
+        this.speedY=randRange(-140,-30);
+        this.color=color; this.size=randRange(2,4);
+    }
+    update(dt){ this.life-=dt*2; this.x+=this.speedX*dt; this.y+=this.speedY*dt; }
+    draw(ctx){
+        ctx.save();
+        ctx.globalAlpha=clamp(this.life,0,1);
+        ctx.fillStyle=`rgba(${this.color},${this.life})`;
+        ctx.fillRect(this.x,this.y,this.size,this.size);
+        ctx.restore();
+    }
+}
+
+/* Figuras */
+class Shape {
+    constructor(game,intensity,lane,type){
+        this.game=game;
+        this.lane=lane;
+        this.type=type;
+        this.baseSize=randRange(18,28)+intensity*14;
+        this.size=this.baseSize;
+        this.x=game.getLaneCenter(lane);
+        this.y=-this.baseSize;
+        this.baseSpeed=randRange(130,180)+intensity*150;
+        this.rotation=randRange(0,Math.PI*2);
+        this.rotationSpeed=randRange(-1.2,1.2);
+        this.phase=Math.random()*Math.PI*2;
+    }
+    update(dt,beatPulse,intensity){
+        const speedMod=1+beatPulse*0.25+intensity*0.12;
+        this.y+=this.baseSpeed*dt*speedMod;
+        this.rotation+=this.rotationSpeed*dt*(0.5+intensity*0.5);
+        const wobble=1+Math.sin(performance.now()/1000*2+this.phase)*0.04;
+        this.size=this.baseSize*(wobble+beatPulse*0.2);
+    }
+    draw(ctx,beatPulse,time){
+        ctx.save();
+        ctx.translate(this.x,this.y);
+        const pulseScale=1+beatPulse*0.18+Math.sin(time*1.6+this.phase)*0.03;
+        ctx.scale(pulseScale,pulseScale);
+        ctx.rotate(this.rotation);
+        ctx.fillStyle=`rgba(255,255,255,${0.55+beatPulse*0.3})`;
+        ctx.strokeStyle=`rgba(255,255,255,0.8)`;
+        ctx.lineWidth=1;
+        const s=this.size;
+        ctx.beginPath();
+        if(this.type==="circle"){
+            ctx.arc(0,0,s/2,0,Math.PI*2);
+        }else if(this.type==="triangle"){
+            ctx.moveTo(0,-s/2);
+            ctx.lineTo(s/2,s/2);
+            ctx.lineTo(-s/2,s/2);
+            ctx.closePath();
+        }else{
+            ctx.rect(-s/2,-s/2,s,s);
+        }
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+    isOut(height,hitLine,missWindow){
+        return this.y - hitLine > missWindow;
+    }
+}
+
+/* Audio Controller */
+class AudioController {
+    constructor(){
+        this.mode="auto";
+        this.context=null;
+        this.analyser=null;
+        this.lowAnalyser=null;
+        this.sourceNode=null;
+        this.lowpass=null;
+        this.highpass=null;
+        this.audioElement=new Audio();
+        this.audioElement.loop=true;
+        this.audioElement.crossOrigin="anonymous";
+        this.freqData=null;
+        this.timeData=null;
+        this.lowTimeData=null;
+        this.lowByteFallback=null;
+        this.currentIntensity=0;
+        this.smoothIntensity=0;
+        this.baselineLow=0;
+        this.fakeTime=0;
+        this.autoBeatInterval=0.6;
+        this.autoBeatTimer=0;
+        this.visualBeat=0;
+        this.pendingBeat=false;
+        this.lastBeatTime=performance.now();
+        this.peakIntervals=[];
+        this.beatInterval=0.6;
+        this.energyHistory=[];
+    }
+    async initAudioGraph(){
+        if(!this.context){
+            const AudioCtx=window.AudioContext||window.webkitAudioContext;
+            this.context=new AudioCtx();
+        }
+        if(!this.analyser){
+            this.analyser=this.context.createAnalyser();
+            this.analyser.fftSize=2048;
+            this.freqData=new Uint8Array(this.analyser.frequencyBinCount);
+            this.timeData=new Uint8Array(this.analyser.fftSize);
+        }
+        if(!this.lowAnalyser){
+            this.lowpass=this.context.createBiquadFilter();
+            this.lowpass.type="lowpass";
+            this.lowpass.frequency.value=220;
+            this.lowpass.Q.value=1;
+            this.highpass=this.context.createBiquadFilter();
+            this.highpass.type="highpass";
+            this.highpass.frequency.value=28;
+            this.lowAnalyser=this.context.createAnalyser();
+            this.lowAnalyser.fftSize=1024;
+            this.lowTimeData=new Float32Array(this.lowAnalyser.fftSize);
+            this.lowByteFallback=new Uint8Array(this.lowAnalyser.fftSize);
+            this.lowpass.connect(this.highpass);
+            this.highpass.connect(this.lowAnalyser);
+        }
+        if(!this.sourceNode){
+            this.sourceNode=this.context.createMediaElementSource(this.audioElement);
+            this.sourceNode.connect(this.analyser);
+            this.sourceNode.connect(this.lowpass);
+            this.analyser.connect(this.context.destination);
+        }
+    }
+    async loadFile(file){
+        if(!file) return;
+        await this.initAudioGraph();
+        this.mode="local";
+        this.audioElement.src=URL.createObjectURL(file);
+        await this.resumePlayback();
+    }
+    async loadPlaceholder(){
+        if(!PLACEHOLDER_AUDIO_URL){
+            alert("Define PLACEHOLDER_AUDIO_URL con un audio compatible (CORS).");
+            return;
+        }
+        await this.initAudioGraph();
+        this.mode="placeholder";
+        this.audioElement.src=PLACEHOLDER_AUDIO_URL;
+        await this.resumePlayback();
+    }
+    async resumePlayback(){
+        try{
+            await this.context.resume();
+            await this.audioElement.play();
+        }catch(err){ console.warn("No se pudo iniciar audio aún:",err); }
+        this.audioElement.onended=()=>{ this.mode="auto"; };
+    }
+    update(dt){
+        if(this.mode==="auto"||!this.context||!this.analyser){
+            this.fakeTime+=dt;
+            const sin1=Math.sin(this.fakeTime*1.7)*0.35;
+            const sin2=Math.sin(this.fakeTime*0.45+1.2)*0.2;
+            const raw=clamp(0.55+sin1+sin2,0,1);
+            const alpha=1-Math.exp(-dt*2.8);
+            this.smoothIntensity+=(raw-this.smoothIntensity)*alpha;
+            this.currentIntensity=this.smoothIntensity;
+            const bpm=118+Math.sin(this.fakeTime*0.12)*24;
+            this.autoBeatInterval=60/bpm;
+            this.autoBeatTimer+=dt;
+            if(this.autoBeatTimer>=this.autoBeatInterval){
+                this.autoBeatTimer-=this.autoBeatInterval;
+                this.triggerBeat(this.autoBeatInterval);
+            }
+            this.visualBeat*=Math.exp(-dt*4.2);
+            return;
+        }
+
+        if(this.context.state==="suspended") this.context.resume();
+
+        this.analyser.getByteFrequencyData(this.freqData);
+        this.analyser.getByteTimeDomainData(this.timeData);
+        if(this.lowAnalyser){
+            if(this.lowAnalyser.getFloatTimeDomainData){
+                this.lowAnalyser.getFloatTimeDomainData(this.lowTimeData);
+            }else{
+                this.lowAnalyser.getByteTimeDomainData(this.lowByteFallback);
+                for(let i=0;i<this.lowByteFallback.length;i++){
+                    this.lowTimeData[i]=(this.lowByteFallback[i]-128)/128;
+                }
+            }
+        }
+
+        const lowBins=Math.max(8,Math.floor(this.freqData.length*0.15));
+        let lowSum=0;
+        for(let i=0;i<lowBins;i++) lowSum+=this.freqData[i];
+        const lowAvg=(lowSum/lowBins)/255;
+        this.baselineLow+=(lowAvg-this.baselineLow)*0.02;
+
+        let rmsSum=0;
+        for(let i=0;i<this.timeData.length;i++){
+            const sample=(this.timeData[i]-128)/128;
+            rmsSum+=sample*sample;
+        }
+        const rms=Math.sqrt(rmsSum/this.timeData.length);
+
+        const rawIntensity=clamp(lowAvg*0.85+rms*0.55,0,1);
+        const alpha=1-Math.exp(-dt*3.2);
+        this.smoothIntensity+=(rawIntensity-this.smoothIntensity)*alpha;
+        this.currentIntensity=this.smoothIntensity;
+
+        if(this.lowTimeData){
+            let energy=0;
+            for(let i=0;i<this.lowTimeData.length;i++){
+                energy+=this.lowTimeData[i]*this.lowTimeData[i];
+            }
+            energy/=this.lowTimeData.length;
+            this.energyHistory.push(energy);
+            if(this.energyHistory.length>60) this.energyHistory.shift();
+
+            const avgEnergy=this.energyHistory.reduce((a,b)=>a+b,0)/this.energyHistory.length;
+            const variance=this.energyHistory.reduce((a,b)=>a+(b-avgEnergy)**2,0)/this.energyHistory.length;
+            const threshold=avgEnergy + Math.sqrt(variance)*1.5 + 0.0004;
+            const now=performance.now();
+            if(energy>threshold && (now-this.lastBeatTime)>170){
+                const interval=(now-this.lastBeatTime)/1000;
+                this.lastBeatTime=now;
+                if(interval>0.25 && interval<1.4){
+                    this.peakIntervals.push(interval);
+                    if(this.peakIntervals.length>10) this.peakIntervals.shift();
+                    const avg=this.peakIntervals.reduce((a,b)=>a+b,0)/this.peakIntervals.length;
+                    this.beatInterval=clamp(avg,0.35,1.1);
+                }
+                this.triggerBeat(interval);
+            }
+        }
+        this.visualBeat*=Math.exp(-dt*4.2);
+    }
+    triggerBeat(interval){
+        this.visualBeat=1;
+        this.pendingBeat=true;
+        if(interval) this.beatInterval=clamp(interval,0.35,1.1);
+    }
+    consumeBeat(){ const beat=this.pendingBeat; this.pendingBeat=false; return beat; }
+    getBeatPulse(){ return this.visualBeat; }
+    getIntensity(){ return this.currentIntensity; }
+    getBeatInterval(){ return this.beatInterval||0.6; }
+    getStatusLabel(){
+        if(this.mode==="local") return "Local";
+        if(this.mode==="placeholder") return "Placeholder";
+        return "Auto";
+    }
+}
+
+/* Juego principal */
+class Game {
+    constructor(canvas){
+        this.canvas=canvas;
+        this.ctx=canvas.getContext("2d");
+        this.width=canvas.width;
+        this.height=canvas.height;
+
+        this.lanes=3;
+        this.laneWidth=this.width*0.22;
+        this.trackWidth=this.laneWidth*this.lanes;
+        this.trackOffset=this.width/2-this.trackWidth/2;
+
+        this.hitLine=this.height-150;
+        this.hitWindow=38;
+        this.missWindow=80;
+
+        this.audio=new AudioController();
+        this.shapes=[];
+        this.particles=[];
+        this.score=0;
+        this.energy=100;
+        this.combo=0;
+        this.maxCombo=0;
+        this.state="start";
+        this.intensity=0;
+        this.beatPulse=0;
+        this.patternTimer=0;
+        this.stepIndex=0;
+        this.laneCooldowns=new Array(this.lanes).fill(0);
+        this.lastHitQuality="";
+        this.feedbackTimer=0;
+        this.padStates=new Array(this.lanes).fill(0);
+
+        this.padEls=[...document.querySelectorAll('.lane-pad')].sort(
+            (a,b)=>Number(a.dataset.lane)-Number(b.dataset.lane)
+        );
+
+        this.ui={
+            score:document.getElementById("scoreValue"),
+            combo:document.getElementById("comboValue"),
+            energyFill:document.getElementById("energyFill"),
+            energyLabel:document.getElementById("energyLabel"),
+            intensityValue:document.getElementById("intensityValue"),
+            intensityFill:document.getElementById("intensityFill"),
+            audioStatus:document.getElementById("audioStatus"),
+            finalScore:document.getElementById("finalScore"),
+            startScreen:document.getElementById("startScreen"),
+            gameOverScreen:document.getElementById("gameOverScreen")
+        };
+    }
+
+    getLaneCenter(lane){
+        return this.trackOffset + this.laneWidth*(lane+0.5);
+    }
+    resize(w,h){
+        this.width=w; this.height=h;
+        this.laneWidth=this.width*0.22;
+        this.trackWidth=this.laneWidth*this.lanes;
+        this.trackOffset=this.width/2-this.trackWidth/2;
+        this.hitLine=this.height-150;
+    }
+    reset(){
+        this.shapes=[];
+        this.particles=[];
+        this.score=0;
+        this.energy=100;
+        this.combo=0;
+        this.maxCombo=0;
+        this.patternTimer=0;
+        this.stepIndex=0;
+        this.laneCooldowns=new Array(this.lanes).fill(0);
+        this.lastHitQuality="";
+        this.feedbackTimer=0;
+    }
+    startGame(){
+        this.reset();
+        this.state="playing";
+        this.hideModal(this.ui.startScreen);
+        this.hideModal(this.ui.gameOverScreen);
+    }
+    backToMenu(){
+        this.reset();
+        this.state="start";
+        this.showModal(this.ui.startScreen);
+        this.hideModal(this.ui.gameOverScreen);
+    }
+    gameOver(){
+        this.state="gameover";
+        this.ui.finalScore.textContent=this.score;
+        this.showModal(this.ui.gameOverScreen);
+    }
+    showModal(m){ m.classList.remove("hidden"); }
+    hideModal(m){ m.classList.add("hidden"); }
+
+    spawnShape(intensity,lane){
+        if(this.laneCooldowns[lane]>0) return;
+        const type=LANE_TYPES[lane];
+        this.shapes.push(new Shape(this,intensity,lane,type));
+        this.laneCooldowns[lane]=0.4;
+    }
+    emitPattern(intensity,isBeat=false){
+        const available=[0,1,2];
+        const chooseLane=()=>{
+            if(!available.length) return null;
+            return available.splice(Math.floor(Math.random()*available.length),1)[0];
+        };
+        let count=isBeat ? (intensity>0.7?3:intensity>0.4?2:1)
+                         : (intensity>0.7?2:intensity>0.35?1:(Math.random()<0.35?1:0));
+        count=Math.min(count,3);
+        for(let i=0;i<count;i++){
+            const lane=chooseLane();
+            if(lane!==null) this.spawnShape(intensity,lane);
+        }
+        this.stepIndex++;
+    }
+
+    handleLanePress(lane){
+        if(this.state!=="playing") return;
+        this.padStates[lane]=1;
+        this.padEls[lane]?.classList.add("active");
+        const hit=this.attemptHit(lane);
+        if(!hit) this.registerMistap();
+    }
+    handleLaneRelease(lane){
+        this.padEls[lane]?.classList.remove("active");
+    }
+
+    attemptHit(lane){
+        const target=this.shapes
+            .filter(s=>s.lane===lane)
+            .sort((a,b)=>Math.abs(a.y-this.hitLine)-Math.abs(b.y-this.hitLine))
+            .find(s=>Math.abs(s.y-this.hitLine)<=this.hitWindow);
+        if(target){
+            const diff=Math.abs(target.y-this.hitLine);
+            this.resolveHit(target,diff);
+            return true;
+        }
+        return false;
+    }
+    resolveHit(shape,diff){
+        const rating = diff<=12 ? "Perfect" : diff<=24 ? "Great" : "Good";
+        this.score += Math.round((RATING_POINTS[rating]||90)*(1+this.intensity*0.3));
+        this.energy = clamp(this.energy+(RATING_ENERGY[rating]||4),0,100);
+        this.combo++;
+        this.maxCombo=Math.max(this.maxCombo,this.combo);
+        this.lastHitQuality=rating;
+        this.feedbackTimer=0.7;
+        this.addParticles(shape.x,this.hitLine,rating==="Perfect"?16:10);
+        this.shapes.splice(this.shapes.indexOf(shape),1);
+    }
+    registerMistap(){
+        this.combo=0;
+        this.energy=clamp(this.energy-3,0,100);
+        this.lastHitQuality="Miss";
+        this.feedbackTimer=0.4;
+    }
+    registerMiss(shape){
+        this.combo=0;
+        this.energy=clamp(this.energy-8,0,100);
+        this.lastHitQuality="Miss";
+        this.feedbackTimer=0.5;
+        this.addParticles(shape.x,this.hitLine+8,8);
+    }
+
+    update(dt){
+        this.audio.update(dt);
+        this.intensity=this.audio.getIntensity();
+        this.beatPulse=this.audio.getBeatPulse();
+        const beatHit=this.audio.consumeBeat();
+
+        if(this.state==="playing"){
+            this.laneCooldowns=this.laneCooldowns.map(cd=>Math.max(0,cd-dt));
+
+            if(beatHit){
+                this.patternTimer=0;
+                this.emitPattern(this.intensity,true);
+            }
+            const beatInterval=this.audio.getBeatInterval();
+            const subdivision=this.getSubdivision();
+            const subInterval=beatInterval/subdivision;
+            this.patternTimer+=dt;
+            while(this.patternTimer>=subInterval){
+                this.patternTimer-=subInterval;
+                this.emitPattern(this.intensity,false);
+            }
+
+            this.shapes.forEach(shape=>shape.update(dt,this.beatPulse,this.intensity));
+
+            for(let i=this.shapes.length-1;i>=0;i--){
+                const shape=this.shapes[i];
+                if(shape.isOut(this.height,this.hitLine,this.missWindow)){
+                    this.registerMiss(shape);
+                    this.shapes.splice(i,1);
+                }
+            }
+
+            if(this.energy<=0) this.gameOver();
+        }
+
+        this.particles=this.particles.filter(p=>p.life>0);
+        this.particles.forEach(p=>p.update(dt));
+
+        this.padStates=this.padStates.map(val=>Math.max(0,val-dt*3.2));
+        if(this.feedbackTimer>0) this.feedbackTimer-=dt;
+
+        this.updateUI();
+    }
+
+    getSubdivision(){
+        if(this.intensity<0.25) return 2;
+        if(this.intensity<0.5) return 4;
+        if(this.intensity<0.75) return 6;
+        return 8;
+    }
+
+    addParticles(x,y,amount){
+        for(let i=0;i<amount;i++) this.particles.push(new Particle(x,y));
+    }
+
+    updateUI(){
+        this.ui.score.textContent=this.score;
+        this.ui.combo.textContent=this.combo;
+        this.ui.energyFill.style.width=`${this.energy}%`;
+        this.ui.energyLabel.textContent=`${Math.round(this.energy)}%`;
+        this.ui.intensityValue.textContent=`${Math.round(this.intensity*100)}%`;
+        this.ui.intensityFill.style.width=`${clamp(this.intensity*100,3,100)}%`;
+        this.ui.audioStatus.textContent=this.audio.getStatusLabel();
+    }
+
+    drawBackground(time){
+        const ctx=this.ctx;
+        ctx.save();
+        ctx.fillStyle="#030303";
+        ctx.fillRect(0,0,this.width,this.height);
+
+        ctx.strokeStyle=`rgba(255,255,255,${0.05+this.intensity*0.15+this.beatPulse*0.15})`;
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.roundRect(this.trackOffset-20,40,this.trackWidth+40,this.height-120,30);
+        ctx.stroke();
+
+        for(let lane=0; lane<=this.lanes; lane++){
+            const x=this.trackOffset+lane*this.laneWidth;
+            ctx.strokeStyle=`rgba(255,255,255,${lane===0||lane===this.lanes?0.3:0.12})`;
+            ctx.lineWidth= lane===0||lane===this.lanes ? 2 : 1;
+            ctx.beginPath();
+            ctx.moveTo(x,40);
+            ctx.lineTo(x,this.height-80);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle=`rgba(255,255,255,${0.05+this.intensity*0.2})`;
+        for(let i=0;i<6;i++){
+            ctx.beginPath();
+            const y=this.height*0.15 + i*(this.height*0.12) +
+                     Math.sin(time*1.2+i)*15*this.intensity;
+            ctx.moveTo(this.trackOffset-30,y);
+            ctx.lineTo(this.trackOffset+this.trackWidth+30,y);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle=`rgba(255,255,255,${0.4+this.beatPulse*0.3})`;
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(this.trackOffset-15,this.hitLine);
+        ctx.lineTo(this.trackOffset+this.trackWidth+15,this.hitLine);
+        ctx.stroke();
+
+        for(let lane=0; lane<this.lanes; lane++){
+            const center=this.getLaneCenter(lane);
+            ctx.save();
+            ctx.translate(center,this.hitLine+45);
+            const glow=0.1+this.padStates[lane]*0.4+this.beatPulse*0.15;
+            ctx.fillStyle=`rgba(255,255,255,${glow})`;
+            ctx.font="700 28px 'Space Mono', monospace";
+            ctx.textAlign="center";
+            ctx.fillText(LANE_SYMBOLS[lane],0,0);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    draw(){
+        const ctx=this.ctx;
+        const time=performance.now()/1000;
+        ctx.clearRect(0,0,this.width,this.height);
+        this.drawBackground(time);
+        this.shapes.forEach(shape=>shape.draw(ctx,this.beatPulse,time));
+        this.particles.forEach(p=>p.draw(ctx));
+
+        if(this.feedbackTimer>0 && this.lastHitQuality){
+            ctx.save();
+            ctx.globalAlpha=clamp(this.feedbackTimer/0.7,0,1);
+            ctx.fillStyle="#fff";
+            ctx.font="700 36px 'Space Mono', monospace";
+            ctx.textAlign="center";
+            ctx.fillText(this.lastHitQuality,this.width/2,this.hitLine-40);
+            if(this.combo>1){
+                ctx.font="500 20px 'Space Mono', monospace";
+                ctx.fillText(`${this.combo} combo`,this.width/2,this.hitLine-15);
+            }
+            ctx.restore();
+        }
+
+        if(this.state==="start"){
+            ctx.save();
+            ctx.fillStyle="rgba(255,255,255,0.04)";
+            ctx.font="700 48px 'Space Mono', monospace";
+            ctx.textAlign="center";
+            ctx.fillText("Haz clic en Comenzar",this.width/2,this.height*0.5);
+            ctx.restore();
+        }
+    }
+}
+
+/* Inicialización */
+const canvas=document.getElementById("gameCanvas");
+const game=new Game(canvas);
+
+function resizeCanvas(){
+    canvas.width=window.innerWidth;
+    canvas.height=window.innerHeight;
+    game.resize(canvas.width,canvas.height);
+}
+window.addEventListener("resize",resizeCanvas);
+resizeCanvas();
+
+let lastTime=0;
+function gameLoop(timestamp){
+    const dt=(timestamp-lastTime)/1000||0.016;
+    lastTime=timestamp;
+    game.update(dt);
+    game.draw();
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+/* Controles teclado */
+const activeKeys=new Set();
+window.addEventListener("keydown",e=>{
+    const lane=KEY_TO_LANE[e.key];
+    if(lane!==undefined){
+        if(!activeKeys.has(e.key)){
+            activeKeys.add(e.key);
+            game.handleLanePress(lane);
+        }
+        e.preventDefault();
+    }
+});
+window.addEventListener("keyup",e=>{
+    const lane=KEY_TO_LANE[e.key];
+    if(lane!==undefined){
+        activeKeys.delete(e.key);
+        game.handleLaneRelease(lane);
+        e.preventDefault();
+    }
+});
+
+/* Pads táctiles */
+document.querySelectorAll('.lane-pad').forEach(btn=>{
+    const lane=Number(btn.dataset.lane);
+    const press=e=>{ e.preventDefault(); game.handleLanePress(lane); };
+    const release=e=>{ e.preventDefault(); game.handleLaneRelease(lane); };
+    btn.addEventListener("pointerdown",press);
+    btn.addEventListener("pointerup",release);
+    btn.addEventListener("pointerleave",release);
+    btn.addEventListener("pointercancel",release);
+});
+
+/* UI */
+const startButtons=[
+    document.getElementById("startButton"),
+    document.getElementById("startGameBtn"),
+    document.getElementById("restartButton"),
+    document.getElementById("playAgainBtn")
+];
+startButtons.forEach(btn=>btn.addEventListener("click",()=>game.startGame()));
+document.getElementById("backToMenuBtn").addEventListener("click",()=>game.backToMenu());
+
+function handleFileInput(file){ if(file) game.audio.loadFile(file); }
+document.getElementById("audioInput").addEventListener("change",e=>handleFileInput(e.target.files[0]));
+document.getElementById("audioInputStart").addEventListener("change",e=>handleFileInput(e.target.files[0]));
+
+[document.getElementById("placeholderButton"),document.getElementById("placeholderButtonStart")]
+    .forEach(btn=>btn.addEventListener("click",()=>game.audio.loadPlaceholder()));
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spiral 2</title>
+</head>
+<body>
+<div id="bat-space-wrap">
+  <canvas id="bat-space"></canvas>
+  <svg id="bat-spiral"></svg>
+</div>
+
+<style>
+  html, body {
+    width:100%;
+    height:100%;
+    margin:0;
+    padding:0;
+    background:#05070a;
+    overflow:hidden;
+  }
+  #bat-space-wrap{
+    position:fixed;
+    inset:0;
+    background:#05070a;
+    overflow:hidden;
+  }
+  #bat-space, #bat-spiral{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  #bat-spiral{ pointer-events:none; }
+
+  .stream-line{
+    font-family: Inter, Arial, sans-serif;
+    font-weight: 700;
+    fill: rgba(210,220,235,.92);
+    letter-spacing: .35px;
+    dominant-baseline: middle;
+  }
+</style>
+
+<script>
+(() => {
+  const wrap = document.getElementById("bat-space-wrap");
+  const canvas = document.getElementById("bat-space");
+  const svg = document.getElementById("bat-spiral");
+  const ctx = canvas.getContext("2d");
+
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const TAU = Math.PI * 2;
+  const NS = "http://www.w3.org/2000/svg";
+  const XLINK = "http://www.w3.org/1999/xlink";
+
+  // -------- Texto largo (3 párrafos) --------
+  const LOREM = [
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.",
+    "Proin porttitor, orci nec nonummy molestie, enim est eleifend mi, non fermentum diam nisl sit amet erat. Duis semper. Duis arcu massa, scelerisque vitae, consequat in, pretium a, enim. Pellentesque congue. Ut in risus volutpat libero pharetra tempor.",
+    "Cras vestibulum bibendum augue. Praesent egestas leo in pede. Praesent blandit odio eu enim. Pellentesque sed dui ut augue blandit sodales. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Aliquam nibh."
+  ].join(" ");
+
+  // -------- Config --------
+  const TURNS = 3.4;
+  const R_START = 360;
+  const R_END = 22;
+  const SEGMENTS = 420;
+
+  const BASE_FONT = 24;
+  const MIN_FONT = 2.2;
+  const FLOW_SPEED = 0.008; // lenta
+
+  // Fase 1: entra en línea
+  const ENTRY_SECONDS = 4.0;
+  // Fase 2: línea -> espiral
+  const MORPH_SECONDS = 5.0;
+
+  // partículas
+  const P_COUNT = 1200;
+  const P_ORBIT_R = 130;
+  const P_ROT = 0.0011;
+
+  let w,h,cx,cy,t=0,pAngle=0,last=0;
+  let particles = [];
+
+  // nodos svg
+  let linePath, spiralPath, activePath, textNode, textPathNode;
+
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const easeInOut = x => x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2;
+
+  function resize(){
+    const r = wrap.getBoundingClientRect();
+    w = r.width; h = r.height; cx=w/2; cy=h/2;
+
+    canvas.width = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+
+    svg.setAttribute("viewBox", `${-w/2} ${-h/2} ${w} ${h}`);
+    buildSVG();
+    initParticles();
+  }
+
+  function initParticles(){
+    particles = [];
+    for(let i=0;i<P_COUNT;i++){
+      const a = Math.random()*TAU;
+      const rr = Math.sqrt(Math.random()) * P_ORBIT_R;
+      const z = Math.random()*2 - 1;
+      particles.push({ x:Math.cos(a)*rr, y:Math.sin(a)*rr*1.08, z });
+    }
+  }
+
+  function buildLinePath(){
+    // línea horizontal larga que cruza viewport
+    const x1 = -w*1.4, x2 = w*1.4;
+    const y = 0;
+    return `M ${x1} ${y} L ${x2} ${y}`;
+  }
+
+  function spiralPathD(){
+    let d = "";
+    for(let i=0;i<=SEGMENTS;i++){
+      const u=i/SEGMENTS;
+      const th = u*TURNS*TAU;
+      const r = lerp(R_START,R_END,u);
+      const x = Math.cos(th)*r;
+      const y = Math.sin(th)*r;
+      d += (i===0?"M ":"L ") + `${x.toFixed(2)} ${y.toFixed(2)} `;
+    }
+    return d.trim();
+  }
+
+  function buildSVG(){
+    svg.innerHTML = "";
+    const defs = document.createElementNS(NS,"defs");
+
+    linePath = document.createElementNS(NS,"path");
+    linePath.setAttribute("id","path-line");
+    linePath.setAttribute("d", buildLinePath());
+    linePath.setAttribute("fill","none");
+    defs.appendChild(linePath);
+
+    spiralPath = document.createElementNS(NS,"path");
+    spiralPath.setAttribute("id","path-spiral");
+    spiralPath.setAttribute("d", spiralPathD());
+    spiralPath.setAttribute("fill","none");
+    defs.appendChild(spiralPath);
+
+    // path activo (lo vamos interpolando)
+    activePath = document.createElementNS(NS,"path");
+    activePath.setAttribute("id","path-active");
+    activePath.setAttribute("d", buildLinePath());
+    activePath.setAttribute("fill","none");
+    defs.appendChild(activePath);
+
+    svg.appendChild(defs);
+
+    textNode = document.createElementNS(NS,"text");
+    textNode.setAttribute("class","stream-line");
+    textNode.setAttribute("font-size", BASE_FONT);
+
+    textPathNode = document.createElementNS(NS,"textPath");
+    textPathNode.setAttributeNS(XLINK,"xlink:href","#path-active");
+    textPathNode.setAttribute("href","#path-active");
+    textPathNode.setAttribute("text-anchor","start");
+    textPathNode.setAttribute("startOffset","0%");
+    textPathNode.textContent = (LOREM + "   •   ").repeat(12);
+
+    textNode.appendChild(textPathNode);
+    svg.appendChild(textNode);
+  }
+
+  // interpolación line path -> spiral path (mismo # de segmentos)
+  function mixedPath(m){
+    // m=0 línea, m=1 espiral
+    let d = "";
+    const x1 = -w*1.4, x2 = w*1.4, y0 = 0;
+
+    for(let i=0;i<=SEGMENTS;i++){
+      const u = i/SEGMENTS;
+
+      // punto en línea
+      const xl = lerp(x1,x2,u);
+      const yl = y0;
+
+      // punto en espiral
+      const th = u*TURNS*TAU;
+      const rs = lerp(R_START,R_END,u);
+      const xs = Math.cos(th)*rs;
+      const ys = Math.sin(th)*rs;
+
+      // mezcla
+      const x = lerp(xl,xs,m);
+      const y = lerp(yl,ys,m);
+
+      d += (i===0?"M ":"L ") + `${x.toFixed(2)} ${y.toFixed(2)} `;
+    }
+    return d.trim();
+  }
+
+  function drawParticles(){
+    pAngle += P_ROT;
+    const ca = Math.cos(pAngle), sa = Math.sin(pAngle);
+
+    for(const p of particles){
+      const x = p.x*ca - p.y*sa;
+      const y = p.x*sa + p.y*ca;
+      const depth = 0.75 + (p.z+1)*0.35;
+      const sx = cx + x*depth;
+      const sy = cy + y*depth;
+      const a = 0.14 + depth*0.24;
+      const s = 0.7 + depth*1.05;
+
+      ctx.fillStyle = `rgba(210,225,245,${a})`;
+      ctx.beginPath(); ctx.arc(sx,sy,s,0,TAU); ctx.fill();
+    }
+  }
+
+  function animate(dt){
+    t += dt;
+
+    // Fases
+    const entryT = clamp(t / ENTRY_SECONDS, 0, 1); // línea entrando desde izquierda
+    const morphT = clamp((t - ENTRY_SECONDS) / MORPH_SECONDS, 0, 1); // línea->espiral
+    const m = easeInOut(morphT);
+
+    // 1) mover toda la línea desde izquierda hasta centro (solo en entry)
+    const startX = -w*1.1;
+    const tx = lerp(startX, 0, easeInOut(entryT));
+    textNode.style.transform = `translate(${tx}px,0px)`;
+
+    // 2) morph de path activo: línea -> espiral
+    activePath.setAttribute("d", mixedPath(m));
+
+    // 3) flujo continuo del texto
+    const off = ((t*7.5) % 100); // lento
+    textPathNode.setAttribute("startOffset", `${off}%`);
+
+    // 4) reducir tamaño SOLO cerca del centro una vez ya hay espiral
+    // simulado por ciclo de avance local
+    const local = ((t*0.10) % 1);
+    let shrink = 0;
+    if(local > 0.80) {
+      const n = (local - 0.80) / 0.20;
+      shrink = Math.pow(clamp(n,0,1), 2.2);
+    }
+
+    const fs = lerp(BASE_FONT, MIN_FONT, m * shrink);
+    const alpha = lerp(0.95, 0.22, m * shrink);
+
+    textNode.setAttribute("font-size", fs.toFixed(2));
+    textNode.setAttribute("fill", `rgba(210,220,235,${alpha.toFixed(3)})`);
+  }
+
+  function drawBg(){
+    ctx.fillStyle="#05070a";
+    ctx.fillRect(0,0,w,h);
+  }
+
+  function loop(ts){
+    if(!last) last = ts;
+    const dt = Math.min(0.033, (ts-last)/1000);
+    last = ts;
+
+    drawBg();
+    drawParticles();
+    animate(dt);
+
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

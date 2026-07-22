@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sticky Geometry With Sticky Labels</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <main class="page">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div>
+        <p class="eyebrow">CSS PURE EXPERIMENT</p>
+        <h1>PORTFOLIO</h1>
+        <p class="hero-note">Sticky geometry and sticky section titles.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 01 -->
+    <section class="chapter chapter-light">
+
+      <div class="sticky-background">
+        <div class="sticky-pin">
+          <p class="sticky-label">01 / CIRCLE</p>
+          <div class="shape circle"></div>
+        </div>
+      </div>
+
+      <div class="copy-flow">
+        <article class="copy-card align-left">
+          <h2>Texto uno.</h2>
+          <p>
+            Este primer bloque sube con el scroll mientras el círculo y el título
+            de sección permanecen fijos en el fondo.
+          </p>
+        </article>
+
+        <article class="copy-card align-right">
+          <h2>Texto dos.</h2>
+          <p>
+            El label de sección ahora pertenece a la capa sticky. Por eso no se va
+            junto con los textos.
+          </p>
+        </article>
+
+        <article class="copy-card align-left">
+          <h2>Texto tres.</h2>
+          <p>
+            Cuando termina esta sección, el círculo y el título sticky se liberan
+            y aparece la siguiente composición.
+          </p>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- SECTION 02 -->
+    <section class="chapter chapter-dark">
+
+      <div class="sticky-background">
+        <div class="sticky-pin">
+          <p class="sticky-label">02 / SQUARE</p>
+          <div class="shape square"></div>
+        </div>
+      </div>
+
+      <div class="copy-flow">
+        <article class="copy-card align-right">
+          <h2>Texto uno.</h2>
+          <p>
+            El cuadrado queda fijo al centro y el identificador de sección queda
+            fijo en una posición editorial.
+          </p>
+        </article>
+
+        <article class="copy-card align-left">
+          <h2>Texto dos.</h2>
+          <p>
+            Los textos se mueven normalmente porque están en otra capa, fuera del
+            contenedor sticky.
+          </p>
+        </article>
+
+        <article class="copy-card align-right">
+          <h2>Texto tres.</h2>
+          <p>
+            Este patrón permite construir secciones con fondo persistente y lectura
+            en movimiento.
+          </p>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- SECTION 03 -->
+    <section class="chapter chapter-light">
+
+      <div class="sticky-background">
+        <div class="sticky-pin">
+          <p class="sticky-label">03 / LINES</p>
+
+          <div class="lines-shape">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="copy-flow">
+        <article class="copy-card align-left">
+          <h2>Texto uno.</h2>
+          <p>
+            Las líneas funcionan como una estructura fija detrás del contenido.
+          </p>
+        </article>
+
+        <article class="copy-card align-right">
+          <h2>Texto dos.</h2>
+          <p>
+            Aunque la geometría está quieta, el desplazamiento del texto genera
+            una sensación de movimiento entre capas.
+          </p>
+        </article>
+
+        <article class="copy-card align-left">
+          <h2>Texto tres.</h2>
+          <p>
+            El título 03 / LINES permanece visible durante toda la sección.
+          </p>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- SECTION 04 -->
+    <section class="chapter chapter-gray">
+
+      <div class="sticky-background">
+        <div class="sticky-pin">
+          <p class="sticky-label">04 / GRID</p>
+          <div class="grid-shape"></div>
+        </div>
+      </div>
+
+      <div class="copy-flow">
+        <article class="copy-card align-right">
+          <h2>Texto uno.</h2>
+          <p>
+            La retícula está creada con CSS usando linear-gradient.
+          </p>
+        </article>
+
+        <article class="copy-card align-left">
+          <h2>Texto dos.</h2>
+          <p>
+            El grid y el título de sección se mantienen fijos mientras el texto
+            atraviesa la composición.
+          </p>
+        </article>
+
+        <article class="copy-card align-right">
+          <h2>Texto tres.</h2>
+          <p>
+            Puedes hacer el label más sutil, más grande o convertirlo en parte
+            dominante del diseño.
+          </p>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- SECTION 05 -->
+    <section class="chapter chapter-dark">
+
+      <div class="sticky-background">
+        <div class="sticky-pin">
+          <p class="sticky-label">05 / POLYGON</p>
+          <div class="shape polygon"></div>
+        </div>
+      </div>
+
+      <div class="copy-flow">
+        <article class="copy-card align-left">
+          <h2>Texto uno.</h2>
+          <p>
+            El polígono está hecho con clip-path.
+          </p>
+        </article>
+
+        <article class="copy-card align-right">
+          <h2>Texto dos.</h2>
+          <p>
+            El título de la sección y la figura pertenecen a la misma capa sticky.
+          </p>
+        </article>
+
+        <article class="copy-card align-left">
+          <h2>Texto tres.</h2>
+          <p>
+            Al terminar la sección, todo el bloque sticky desaparece naturalmente
+            con el flujo de la página.
+          </p>
+        </article>
+      </div>
+
+    </section>
+
+    <!-- OUTRO -->
+    <section class="outro">
+      <h2>END</h2>

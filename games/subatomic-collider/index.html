@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Subatomic Minimal Prototype</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;}
+  canvas{display:block;background:#000;}
+  #hint{
+    position:fixed;left:12px;bottom:12px;color:#fff;
+    font:12px monospace;opacity:.5;user-select:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Drag para energía/dirección · click para iniciar audio</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W,H; function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight;} resize(); addEventListener('resize',resize);
+
+const bgParticles = Array.from({length:140},()=>({
+  x:Math.random()*W,y:Math.random()*H,
+  v:(Math.random()*0.5+0.1),
+  a:Math.random()*Math.PI*2,
+  r:Math.random()*1.5+0.3
+}));
+
+let pointer = {down:false, x:0, y:0, sx:0, sy:0};
+let shots = [];
+let impacts = [];
+let explosionParticles = [];
+let detonations = [];
+let targets = [];
+const MAX_TARGETS = 8;
+
+// efectos virus fractal
+let spiralParticles = [];
+let bolts = [];
+let shockwaves = [];
+
+// nuevo efecto orbit/filamentos
+let filaments = [];
+let dustClouds = [];
+let glows = [];
+
+class SpiralParticle{
+  constructor(x,y,boost=1){
+    this.ox=x; this.oy=y;
+    this.angle=Math.random()*Math.PI*2;
+    this.radius=Math.random()*6;
+    this.radialVel=(Math.random()*3+1)*boost;
+    this.angularVel=(Math.random()*0.2+0.05)*(Math.random()<0.5?-1:1);
+    this.life=0; this.max=140+Math.random()*60;
+    this.alpha=1;
+  }
+  update(){
+    this.life++;
+    this.angle += this.angularVel;
+    this.radius += this.radialVel;
+    this.radialVel *= 0.985;
+    this.alpha = 1 - this.life/this.max;
+  }
+  draw(){
+    const sx = Math.cos(this.angle) * this.radius + Math.sin(this.angle*2)*this.radius*0.15;
+    const sy = Math.sin(this.angle) * this.radius + Math.cos(this.angle*2)*this.radius*0.15;
+    const x = this.ox + sx;
+    const y = this.oy + sy;
+    ctx.strokeStyle = `rgba(255,255,255,${this.alpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - Math.cos(this.angle)*4, y - Math.sin(this.angle)*4);
+    ctx.stroke();
+  }
+  alive(){ return this.life < this.max; }
+}
+
+class LightningBolt{
+  constructor(x,y){
+    this.x=x; this.y=y;
+    this.life=0; this.max=25;
+    const corners = [[0,0],[W,0],[0,H],[W,H]];
+    const c = corners[Math.floor(Math.random()*4)];
+    this.tx=c[0]; this.ty=c[1];
+    this.segments = this.build();
+  }
+  build(){
+    const segs = [];
+    const steps = 12;
+    let px=this.x, py=this.y;
+    for(let i=1;i<=steps;i++){
+      const t=i/steps;
+      const nx = this.x + (this.tx-this.x)*t + (Math.random()-0.5)*40;
+      const ny = this.y + (this.ty-this.y)*t + (Math.random()-0.5)*40;
+      segs.push([px,py,nx,ny]);
+      px=nx; py=ny;
+    }
+    return segs;
+  }
+  update(){ this.life++; }
+  draw(){
+    const a = 1 - this.life/this.max;
+    ctx.strokeStyle = `rgba(180,220,255,${a})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    this.segments.forEach(s=>{
+      ctx.moveTo(s[0],s[1]); ctx.lineTo(s[2],s[3]);
+    });
+    ctx.stroke();
+  }
+  alive(){ return this.life < this.max; }
+}
+
+class Shockwave{
+  constructor(x,y,phase=0){
+    this.x=x; this.y=y;
+    this.r=5+phase*12;
+    this.life=0; this.max=80;
+  }
+  update(){ this.life++; this.r+=2.2; }
+  draw(){
+    const a = 1 - this.life/this.max;
+    ctx.strokeStyle = `rgba(255,255,255,${a*0.6})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.stroke();
+  }
+  alive(){ return this.life < this.max; }
+}
+
+class Filament{
+  constructor(x,y){
+    this.ox=x; this.oy=y;
+    this.angle=Math.random()*Math.PI*2;
+    this.radius=0;
+    this.speed=2+Math.random()*3;
+    this.waveAmp=4+Math.random()*8;
+    this.waveFreq=0.25+Math.random()*0.35;
+    this.phase=Math.random()*Math.PI*2;
+    this.life=0; this.max=120+Math.random()*60;
+    this.history=[];
+  }
+  update(){
+    this.life++;
+    this.radius += this.speed;
+    const baseX = Math.cos(this.angle)*this.radius;
+    const baseY = Math.sin(this.angle)*this.radius;
+    const wave = Math.sin(this.radius*this.waveFreq + this.phase)*this.waveAmp;
+    const nx = baseX + Math.cos(this.angle+Math.PI/2)*wave;
+    const ny = baseY + Math.sin(this.angle+Math.PI/2)*wave;
+    const x = this.ox + nx;
+    const y = this.oy + ny;
+    this.history.push({x,y});
+    if(this.history.length>24) this.history.shift();
+  }
+  draw(){
+    const t = this.life/this.max;
+    const alpha = 1 - t;
+    ctx.strokeStyle = `rgba(255,255,255,${Math.max(0.2,alpha)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    this.history.forEach((p,i)=>{
+      if(i===0) ctx.moveTo(p.x,p.y);
+      else ctx.lineTo(p.x,p.y);
+    });
+    ctx.stroke();
+  }
+  alive(){ return this.life < this.max; }
+}
+
+class DustCloud{
+  constructor(x,y){
+    this.x=x; this.y=y;
+    this.particles = Array.from({length:180},()=>({
+      x:x+(Math.random()-0.5)*30,
+      y:y+(Math.random()-0.5)*30,
+      vx:(Math.random()-0.5)*0.1,
+      vy:(Math.random()-0.5)*0.1,
+      r:Math.random()*1.2+0.3
+    }));
+    this.life=0; this.max=120;
+  }
+  update(){
+    this.life++;
+    this.particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy;
+    });
+  }
+  draw(){
+    const a = 1 - this.life/this.max;
+    ctx.fillStyle=`rgba(255,255,255,${a})`;
+    this.particles.forEach(p=>{
+      ctx.globalAlpha=a;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+  }
+  alive(){ return this.life < this.max; }
+}
+
+class Glow{
+  constructor(x,y){ this.x=x; this.y=y; this.life=0; this.max=40; }
+  update(){ this.life++; }
+  draw(){
+    const a = 1 - this.life/this.max;
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    ctx.fillStyle=`rgba(255,255,255,${a})`;
+    ctx.shadowColor="rgba(255,255,255,0.9)";
+    ctx.shadowBlur=30;
+    ctx.beginPath();
+    ctx.ellipse(0,0,35,20,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  alive(){ return this.life < this.max; }
+}
+
+function randTarget(){
+  const moving = Math.random() < 0.5;
+  const roll = Math.random();
+  const type = roll < 0.2 ? "circle" : (roll < 0.4 ? "star" : (roll < 0.6 ? "poly" : (roll < 0.8 ? "virus" : "orbit")));
+  return {
+    x:W*(0.2+Math.random()*0.7),
+    y:H*(0.2+Math.random()*0.6),
+    r:14+Math.random()*12,
+    alive:true,
+    moving,
+    vx: moving ? (Math.random()*1.2-0.6) : 0,
+    vy: moving ? (Math.random()*1.2-0.6) : 0,
+    type,
+    phase: Math.random()*Math.PI*2,
+    sides: 3 + Math.floor(Math.random()*3),
+    morph: 0,
+    orbit: Math.random()*Math.PI*2,
+    orbitCount: Math.random()<0.5?2:3
+  };
+}
+function fillTargets(){
+  while(targets.filter(t=>t.alive).length < MAX_TARGETS){
+    targets.push(randTarget());
+  }
+}
+fillTargets();
+
+canvas.addEventListener('pointerdown',e=>{
+  pointer.down=true; pointer.sx=e.clientX; pointer.sy=e.clientY;
+  pointer.x=e.clientX; pointer.y=e.clientY;
+});
+canvas.addEventListener('pointermove',e=>{
+  pointer.x=e.clientX; pointer.y=e.clientY;
+});
+canvas.addEventListener('pointerup',e=>{
+  if(!pointer.down) return;
+  pointer.down=false;
+  const dx = pointer.sx - pointer.x;
+  const dy = pointer.sy - pointer.y;
+  shots.push({
+    x:pointer.sx,y:pointer.sy,
+    vx:-dx/15, vy:-dy/15,
+    life:0, dormant:false
+  });
+});
+
+function addImpact(x,y,energy,type){
+  impacts.push({
+    x,y, t:0, energy, type,
+    rings: Array.from({length:6},(_,i)=>({r:i*8+6, w:Math.random()*2+1, jitter:Math.random()*3+1}))
+  });
+
+  if(type==="poly"){
+    const count = 120 + Math.floor(energy*8);
+    for(let i=0;i<count;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = (Math.random()*5+2) * (0.8+energy*0.08);
+      explosionParticles.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp,
+        life:0,
+        max:40+Math.random()*50,
+        size:Math.random()*3+1,
+        spin:(Math.random()-0.5)*0.8,
+        tri:true
+      });
+    }
+  } else {
+    const count = 80 + Math.floor(energy*6);
+    for(let i=0;i<count;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = (Math.random()*3+1) * (0.8+energy*0.1);
+      explosionParticles.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp,
+        life:0,
+        max:60+Math.random()*50,
+        size:Math.random()*2+0.5,
+        spin:(Math.random()-0.5)*0.3,
+        tri:false
+      });
+    }
+  }
+
+  if(type==="virus"){
+    for(let i=0;i<260;i++) spiralParticles.push(new SpiralParticle(x,y,1.8));
+    for(let i=0;i<6;i++) bolts.push(new LightningBolt(x,y));
+    shockwaves.push(new Shockwave(x,y,0), new Shockwave(x,y,1), new Shockwave(x,y,2));
+  }
+
+  if(type==="orbit"){
+    for(let i=0;i<220;i++) filaments.push(new Filament(x,y));
+    dustClouds.push(new DustCloud(x,y));
+    glows.push(new Glow(x,y));
+  }
+
+  if(audio.started) audio.hit(energy);
+}
+
+function addDetonation(x,y){
+  detonations.push({x,y,t:0});
+  const count = 140 + Math.floor(Math.random()*60);
+  for(let i=0;i<count;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = (Math.random()*6+2);
+    explosionParticles.push({
+      x,y,
+      vx:Math.cos(a)*sp,
+      vy:Math.sin(a)*sp,
+      life:0,
+      max:40+Math.random()*40,
+      size:Math.random()*3+1,
+      spin:(Math.random()-0.5)*0.6,
+      tri:true
+    });
+  }
+  if(audio.started) audio.hit(8);
+}
+
+function drawCircle(t){
+  ctx.beginPath();
+  ctx.arc(0,0,t.r,0,Math.PI*2);
+  ctx.stroke();
+}
+function drawStarCircle(t){
+  const steps = 80;
+  ctx.beginPath();
+  for(let i=0;i<=steps;i++){
+    const a = i/steps * Math.PI*2;
+    const wave = Math.sin(a*8 + t.phase + t.morph);
+    const spike = Math.pow(Math.abs(wave), 0.6) * 4;
+    const rr = t.r + (wave>0? spike : -spike*0.4);
+    const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.stroke();
+}
+function drawMorphPoly(t){
+  const n = t.sides;
+  const morph = (Math.sin(t.morph)+1)/2;
+  const r = t.r * (0.6 + 0.4*morph);
+  ctx.beginPath();
+  for(let i=0;i<=n;i++){
+    const a = i/n * Math.PI*2 + t.phase;
+    const rr = r + Math.sin(a*3 + t.morph)*1.2;
+    const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.stroke();
+  if(morph > 0.98){
+    t.sides = 3 + Math.floor(Math.random()*4);
+  }
+}
+function drawVirus(t){
+  const steps=60;
+  ctx.beginPath();
+  for(let i=0;i<=steps;i++){
+    const a = i/steps*Math.PI*2;
+    const spike = Math.sin(a*7 + t.phase)*4 + Math.sin(a*13)*2;
+    const rr = t.r + spike;
+    const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.stroke();
+}
+function drawOrbit(t){
+  ctx.beginPath();
+  ctx.arc(0,0,t.r,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,255,255,0.25)";
+  ctx.stroke();
+  const orbitR = t.r + 8;
+  for(let i=0;i<t.orbitCount;i++){
+    const a = t.orbit + i*(Math.PI*2/t.orbitCount);
+    ctx.beginPath();
+    ctx.strokeStyle="#fff";
+    ctx.arc(Math.cos(a)*orbitR, Math.sin(a)*orbitR, 3, 0, Math.PI*2);
+    ctx.stroke();
+  }
+}
+
+function drawImpact(im){
+  ctx.save();
+  ctx.translate(im.x, im.y);
+  if(im.type==="circle"){
+    ctx.strokeStyle="rgba(255,255,255,0.6)";
+    im.rings.forEach(r=>{
+      ctx.lineWidth=r.w;
+      ctx.beginPath();
+      ctx.arc(0,0,r.r,0,Math.PI*2);
+      ctx.stroke();
+      r.r += 1.6;
+      r.w *= 0.985;
+    });
+  } else if(im.type==="star"){
+    ctx.strokeStyle="rgba(255,255,255,0.6)";
+    im.rings.forEach(r=>{
+      ctx.lineWidth=r.w;
+      ctx.beginPath();
+      for(let a=0;a<Math.PI*2;a+=0.18){
+        const rr = r.r + Math.sin(a*7 + im.t*0.2)*3;
+        ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr);
+      }
+      ctx.closePath(); ctx.stroke();
+      r.r += 1.5;
+      r.w *= 0.985;
+    });
+  } else if(im.type==="poly"){
+    ctx.strokeStyle="rgba(255,255,255,0.7)";
+    const base = 14 + im.t*1.4;
+    ctx.beginPath();
+    for(let a=0;a<Math.PI*2;a+=0.1){
+      const spike = Math.sin(a*14 + im.t*0.6)*6 + Math.sin(im.t*0.3+a*3)*4;
+      const rr = base + spike;
+      ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,0.35)";
+    for(let i=0;i<28;i++){
+      const a = i*(Math.PI*2/28) + im.t*0.02;
+      const len = 18 + Math.sin(im.t*0.4+i)*20;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*5, Math.sin(a)*5);
+      ctx.lineTo(Math.cos(a)*len, Math.sin(a)*len);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function update(){
+  ctx.clearRect(0,0,W,H);
+
+  // ambient
+  ctx.fillStyle="#fff";
+  bgParticles.forEach(p=>{
+    p.x+=Math.cos(p.a)*p.v; p.y+=Math.sin(p.a)*p.v;
+    if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+    ctx.globalAlpha=0.12;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // targets
+  targets.forEach(t=>{
+    if(!t.alive) return;
+    if(t.moving){
+      t.x+=t.vx; t.y+=t.vy;
+      if(t.x<t.r || t.x>W-t.r) t.vx*=-1;
+      if(t.y<t.r || t.y>H-t.r) t.vy*=-1;
+    }
+    t.morph += 0.03;
+    t.orbit += 0.04;
+    ctx.save();
+    ctx.translate(t.x,t.y);
+    ctx.strokeStyle="#fff"; ctx.lineWidth=1;
+    if(t.type==="circle") drawCircle(t);
+    else if(t.type==="star") drawStarCircle(t);
+    else if(t.type==="virus") drawVirus(t);
+    else if(t.type==="orbit") drawOrbit(t);
+    else drawMorphPoly(t);
+    ctx.restore();
+  });
+
+  // shots
+  shots.forEach(s=>{
+    if(!s.dormant){
+      s.x+=s.vx; s.y+=s.vy;
+      s.vx*=0.995; s.vy*=0.995;
+      if(Math.hypot(s.vx,s.vy) < 0.08){ s.dormant=true; s.vx=0; s.vy=0; }
+    }
+    s.life++;
+    if(!s.dormant){
+      ctx.strokeStyle="rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - s.vx*3, s.y - s.vy*3);
+      ctx.stroke();
+    }
+    ctx.fillStyle="#fff";
+    ctx.beginPath(); ctx.arc(s.x,s.y,2,0,Math.PI*2); ctx.fill();
+
+    targets.forEach(t=>{
+      if(t.alive && Math.hypot(s.x-t.x,s.y-t.y) < t.r){
+        t.alive=false;
+        addImpact(s.x,s.y, Math.hypot(s.vx,s.vy)+2, t.type);
+      }
+    });
+
+    if(!s.dormant){
+      shots.forEach(o=>{
+        if(o!==s && o.dormant && Math.hypot(s.x-o.x,s.y-o.y) < 6){
+          o.dormant=false; o.life=999;
+          addDetonation(o.x,o.y);
+        }
+      });
+    }
+  });
+  shots = shots.filter(s=>s.life<800 && s.x>-50 && s.x<W+50 && s.y>-50 && s.y<H+50);
+
+  // impacts
+  impacts.forEach(im=>{ im.t++; drawImpact(im); });
+  impacts = impacts.filter(im=>im.t<220);
+
+  // abrupt detonation flashes
+  detonations.forEach(d=>{
+    d.t++;
+    ctx.strokeStyle = `rgba(255,255,255,${1 - d.t/20})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(d.x,d.y, d.t*6, 0, Math.PI*2);
+    ctx.stroke();
+  });
+  detonations = detonations.filter(d=>d.t<20);
+
+  // explosion particles
+  explosionParticles.forEach(p=>{
+    p.life++;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.98; p.vy *= 0.98;
+    const alpha = 1 - p.life/p.max;
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    ctx.rotate(p.life * p.spin);
+    ctx.strokeStyle = `rgba(255,255,255,${alpha*0.85})`;
+    ctx.lineWidth = 1;
+    if(p.tri){
+      ctx.beginPath();
+      ctx.moveTo(-p.size, -p.size);
+      ctx.lineTo(p.size, 0);
+      ctx.lineTo(-p.size, p.size);
+      ctx.closePath();
+      ctx.stroke();
+    }else{
+      ctx.beginPath();
+      ctx.moveTo(-p.size*2,0);
+      ctx.lineTo(p.size*2,0);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+  explosionParticles = explosionParticles.filter(p=>p.life<p.max);
+
+  // virus effects
+  spiralParticles.forEach(p=>{p.update(); p.draw();});
+  bolts.forEach(b=>{b.update(); b.draw();});
+  shockwaves.forEach(s=>{s.update(); s.draw();});
+  spiralParticles = spiralParticles.filter(p=>p.alive());
+  bolts = bolts.filter(b=>b.alive());
+  shockwaves = shockwaves.filter(s=>s.alive());
+
+  // orbit filament effects
+  filaments.forEach(f=>{f.update(); f.draw();});
+  dustClouds.forEach(d=>{d.update(); d.draw();});
+  glows.forEach(g=>{g.update(); g.draw();});
+  filaments = filaments.filter(f=>f.alive());
+  dustClouds = dustClouds.filter(d=>d.alive());
+  glows = glows.filter(g=>g.alive());
+
+  if(pointer.down){
+    ctx.strokeStyle="rgba(255,255,255,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(pointer.sx, pointer.sy);
+    ctx.lineTo(pointer.x, pointer.y);
+    ctx.stroke();
+  }
+
+  fillTargets();
+  requestAnimationFrame(update);
+}
+update();
+
+/* --- Audio experimental mínimo --- */
+const audio = {
+  ctx:null, started:false,
+  init(){
+    if(this.started) return;
+    this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+    this.started=true;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type="sine"; o.frequency.value=60;
+    g.gain.value=0.03;
+    o.connect(g).connect(this.ctx.destination);
+    o.start();
+  },
+  hit(energy=3){
+    if(!this.started) return;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const f = 200 + energy*40 + Math.random()*80;
+    o.frequency.value=f;
+    o.type="triangle";
+    g.gain.value=0.06;
+    o.connect(g).connect(this.ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime+0.35);
+    o.stop(this.ctx.currentTime+0.35);
+  }
+};
+window.addEventListener('pointerdown',()=>audio.init(),{once:true});
+</script>
+</body>
+</html>

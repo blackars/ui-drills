@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playable Interface Lab</title>
+  <meta name="description" content="A Micro Arcade Laboratory — minigames, prototypes, and interactive surfaces exploring the web as a playable medium." />
+  <meta property="og:title" content="Playable Interface Lab" />
+  <meta property="og:description" content="Interactive Interface Laboratory — playable web experiments, games, and visual prototypes." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#030303" />
+
+  <style>
+    :root {
+      --bg: #030303;
+      --bg-soft: #080808;
+      --text: #f4f4f4;
+      --muted: #9a9a9a;
+      --line: rgba(255, 255, 255, 0.12);
+      --line-strong: rgba(255, 255, 255, 0.35);
+      --card: #0c0c0c;
+      --white: #ffffff;
+      --black: #000000;
+      --radius: 22px;
+      --transition: 260ms ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; background: var(--bg); }
+
+    body {
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 28rem),
+        radial-gradient(circle at bottom right, rgba(255,255,255,0.04), transparent 24rem),
+        linear-gradient(180deg, #000 0%, #050505 48%, #000 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      opacity: 0.06;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at center, black, transparent 78%);
+    }
+
+    .page {
+      width: min(1480px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 42px 0 56px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 72px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      letter-spacing: -0.03em;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--white);
+      background: var(--white);
+    }
+
+    .top-meta {
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 48px;
+      align-items: end;
+      margin-bottom: 54px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      max-width: 980px;
+      font-size: clamp(3.2rem, 10vw, 10rem);
+      line-height: 0.84;
+      letter-spacing: -0.095em;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .description {
+      color: #d8d8d8;
+      font-size: clamp(1rem, 1.6vw, 1.2rem);
+      line-height: 1.65;
+      max-width: 580px;
+      padding-bottom: 10px;
+    }
+
+    .description strong { color: var(--white); font-weight: 600; }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 22px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      font-size: 0.86rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    .counter {
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .filter-btn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      padding: 6px 14px;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--line-strong);
+      color: var(--text);
+    }
+
+    .filter-btn.active {
+      border-color: var(--white);
+      color: var(--white);
+      background: rgba(255,255,255,0.08);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .game-card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)),
+        var(--card);
+      min-height: 310px;
+      overflow: hidden;
+      cursor: pointer;
+      isolation: isolate;
+      transition:
+        transform var(--transition),
+        border-color var(--transition),
+        background var(--transition);
+    }
+
+    .game-card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      overflow: hidden;
+      padding: 1px;
+      opacity: 0;
+      z-index: 4;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, #fff 0%, #8a8a8a 18%, #000 38%, #fff 55%, #313131 72%, #fff 100%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      transition: opacity var(--transition);
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+      border-color: transparent;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.018)),
+        var(--card);
+    }
+
+    .game-card:hover::before { opacity: 1; }
+
+    .game-card:hover .preview {
+      filter: grayscale(0) contrast(1.2) brightness(1);
+      transform: scale(1.025);
+    }
+
+    .game-card:hover .open-label {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .preview-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      background: #000;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .preview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+      filter: grayscale(1) contrast(1.18) brightness(0.88);
+      transform: scale(1.001);
+      transform-origin: center;
+      pointer-events: none;
+      transition:
+        filter var(--transition),
+        transform var(--transition),
+        opacity var(--transition);
+    }
+
+    .preview-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.72) 100%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px);
+      mix-blend-mode: screen;
+      opacity: 0.5;
+    }
+
+    .placeholder-preview {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,0.42);
+      font-size: 0.75rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,0.09), transparent 26%),
+        linear-gradient(135deg, #000, #111 48%, #000);
+    }
+
+    .placeholder-preview canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.72;
+    }
+
+    .placeholder-preview span {
+      position: relative;
+      z-index: 2;
+    }
+
+    .game-info {
+      padding: 20px;
+      min-height: 132px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .game-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+    }
+
+    .game-title {
+      font-size: clamp(1.08rem, 1.8vw, 1.42rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      max-width: 230px;
+    }
+
+    .game-index {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .game-desc {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      max-width: 92%;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      transition: all var(--transition);
+    }
+
+    .tag[data-tag="game"] {
+      border-color: rgba(255,255,255,0.25);
+      color: #e0e0e0;
+    }
+
+    .tag[data-tag="experience"] {
+      border-color: rgba(255,255,255,0.18);
+      color: #b0b0b0;
+    }
+
+    .tag[data-tag="element"] {
+      border-color: rgba(255,255,255,0.15);
+      color: #909090;
+    }
+
+    .tag[data-tag="test"] {
+      border-color: rgba(255,255,255,0.12);
+      color: #707070;
+    }
+
+    .open-label {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 5;
+      opacity: 0;
+      transform: translateY(-5px);
+      color: #000;
+      background: #fff;
+      border-radius: 0;
+      padding: 8px 12px;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      transition:
+        opacity var(--transition),
+        transform var(--transition);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 14px rgba(255,255,255,0.8);
+      flex: 0 0 auto;
+      margin-top: 5px;
+    }
+
+    .footer {
+      margin-top: 52px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .game-card.hidden {
+      display: none;
+    }
+
+    @media (max-width: 1100px) {
+      .hero { grid-template-columns: 1fr; gap: 28px; }
+      .description { max-width: 760px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      .page { width: min(100% - 28px, 1480px); padding-top: 28px; }
+      .topbar, .section-head, .footer { align-items: flex-start; flex-direction: column; }
+      h1 { font-size: clamp(3.1rem, 18vw, 5.8rem); }
+      .grid { grid-template-columns: 1fr; }
+      .game-card { min-height: auto; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="false"></span>
+        <span>Playable Interface Lab</span>
+      </div>
+      <div class="top-meta">HTML / CSS / JS · Vanilla</div>
+    </header>
+
+    <section class="hero" aria-labelledby="main-title">
+      <div>
+        <p class="eyebrow">Interactive Interface Laboratory</p>
+        <h1 id="main-title">Playable Interface Lab</h1>
+      </div>
+      <p class="description">
+        This project is a <strong>Micro Arcade Laboratory</strong>, a living archive of minigames, prototypes, and interactive surfaces exploring
+        the web as a playable medium. By pushing the boundaries of UI experimentation, it rewrites the rules of traditional UX.
+        The project uses minimal visual systems and serial artistic production as core tools for radical conceptual experimentation.
+      </p>
+    </section>
+
+    <section aria-labelledby="games-title">
+      <div class="section-head">
+        <h2 class="section-title" id="games-title">Active Collection</h2>
+        <p class="counter"><span id="game-count">00 MODULES</span></p>
+      </div>
+
+      <div class="filters" id="filters"></div>
+      <div class="grid" id="games-grid"></div>
+    </section>
+
+    <footer class="footer">
+      <p>Interactive Interface Library</p>
+      <p>Deep white / minimal black / playable web</p>
+    </footer>
+  </main>
+
+  <script>
+    const MODULES = [
+      {
+        title: "ASCII Art Effect",
+        description: "Text-mask particle system with mouse interaction.",
+        route: "./experiences/ascii-art/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "ASCII Glitch Mirror",
+        description: "Webcam-driven ASCII mirror with glitch effects.",
+        route: "./experiences/ascii-glitch-mirror/index.html",
+        tags: ["experience", "element"]
+      },
+      {
+        title: "Circle Typography",
+        description: "Kinetic typography on circular paths.",
+        route: "./experiences/circle-typography/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Spiral 1",
+        description: "Procedural generative spiral visualization.",
+        route: "./experiences/spiral-1/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Spiral 2",
+        description: "Alternate spiral with speed and color controls.",
+        route: "./experiences/spiral-2/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Magnetic Cursor",
+        description: "Reactive field with magnetic cursor tracking.",
+        route: "./experiences/magnetic-cursor/index.html",
+        tags: ["experience", "element"]
+      },
+      {
+        title: "Scroll Tunnel",
+        description: "Infinite depth parallax tunnel on scroll.",
+        route: "./experiences/scroll-tunnel/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Tri-Line",
+        description: "Cinema-minimal generative line composition.",
+        route: "./experiences/tri-line/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Typography Boss",
+        description: "Kinetic typography with preset animations.",
+        route: "./experiences/typography-boss/index.html",
+        tags: ["experience"]
+      },
+      {
+        title: "Clip-Path Effect",
+        description: "Dynamic CSS clip-path masking reveal.",
+        route: "./experiences/clip-path/styles.html",
+        tags: ["element", "test"]
+      },
+      {
+        title: "Zoom Scroll",
+        description: "Background zoom transitions on scroll.",
+        route: "./experiences/zoom-scroll/index.html",
+        tags: ["element"]
+      },
+      {
+        title: "Parallax Gradient",
+        description: "Layered gradient parallax portfolio effect.",
+        route: "./experiences/parallax-gradient/index.html",
+        tags: ["element"]
+      },
+      {
+        title: "Scrollytelling",
+        description: "Narrative scroll-driven scene transitions.",
+        route: "./experiences/scrollytelling/index.html",
+        tags: ["element"]
+      },
+      {
+        title: "Sticky Geometry",
+        description: "Sticky CSS geometry sections with labels.",
+        route: "./experiences/sticky-geometry/index.html",
+        tags: ["element"]
+      },
+      {
+        title: "Dark Snake",
+        description: "Cube-fold grid snake game, dark theme.",
+        route: "./games/dark-snake/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Gravity Dots",
+        description: "Physics-based particle gravity toy.",
+        route: "./games/gravity-dots/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Mirror Split",
+        description: "Dynamic-axis puzzle with mirror reflections.",
+        route: "./games/mirror-split/index.html",
+        tags: ["game", "test"]
+      },
+      {
+        title: "Monolith Defense",
+        description: "Orbital shield defense with tunable parameters.",
+        route: "./games/monolith-defense/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Orbit Lock",
+        description: "Precision-timing orbital synchronization puzzle.",
+        route: "./games/orbit-lock/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Pacman Darks",
+        description: "Pacman variant with dark aesthetic and AI.",
+        route: "./games/pacman-darks/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Prism Runner",
+        description: "Endless runner with prismatic obstacles.",
+        route: "./games/prism-runner/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Dark Pong",
+        description: "Organic breaker — molecules collapse on impact.",
+        route: "./games/dark-pong/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Subatomic Collider",
+        description: "Particle collision and explosion simulator.",
+        route: "./games/subatomic-collider/index.html",
+        tags: ["game", "experience"]
+      },
+      {
+        title: "Void Organism",
+        description: "Space invaders with energy management.",
+        route: "./games/dark-invaders/index.html",
+        tags: ["game"]
+      },
+      {
+        title: "Techno Visualizer",
+        description: "Audio-reactive visual engine with presets.",
+        route: "./games/techno-visualizer/index.html",
+        tags: ["experience", "game"]
+      },
+      {
+        title: "Wave Hunter",
+        description: "3-lane wave capture game with audio input.",
+        route: "./games/wave-hunter/index.html",
+        tags: ["game"]
+      }
+    ];
+
+    const ALL_TAGS = ["game", "experience", "element", "test"];
+    let activeFilter = null;
+
+    const grid = document.getElementById("games-grid");
+    const count = document.getElementById("game-count");
+    const filtersEl = document.getElementById("filters");
+
+    function updateCount() {
+      const visible = grid.querySelectorAll(".game-card:not(.hidden)").length;
+      count.textContent = String(visible).padStart(2, "0") + " MODULES";
+    }
+
+    function createFilters() {
+      const allBtn = document.createElement("button");
+      allBtn.className = "filter-btn active";
+      allBtn.textContent = "All";
+      allBtn.dataset.filter = "all";
+      allBtn.addEventListener("click", () => setFilter(null));
+      filtersEl.appendChild(allBtn);
+
+      ALL_TAGS.forEach(tag => {
+        const btn = document.createElement("button");
+        btn.className = "filter-btn";
+        btn.textContent = tag;
+        btn.dataset.filter = tag;
+        btn.addEventListener("click", () => setFilter(tag));
+        filtersEl.appendChild(btn);
+      });
+    }
+
+    function setFilter(tag) {
+      activeFilter = tag;
+      document.querySelectorAll(".filter-btn").forEach(btn => {
+        btn.classList.toggle("active", tag === null ? btn.dataset.filter === "all" : btn.dataset.filter === tag);
+      });
+      document.querySelectorAll(".game-card").forEach(card => {
+        if (!tag) {
+          card.classList.remove("hidden");
+        } else {
+          const cardTags = card.dataset.tags.split(",");
+          card.classList.toggle("hidden", !cardTags.includes(tag));
+        }
+      });
+      updateCount();
+    }
+
+    function createCard(mod, index) {
+      const card = document.createElement("article");
+      card.className = "game-card";
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", `Open ${mod.title} in a new tab`);
+      card.dataset.tags = mod.tags.join(",");
+
+      const hasRoute = Boolean(mod.route);
+
+      const tagsHTML = mod.tags.map(t => `<span class="tag" data-tag="${t}">${t}</span>`).join("");
+
+      card.innerHTML = `
+        <span class="open-label">Open fullscreen</span>
+
+        <div class="preview-shell">
+          ${hasRoute
+            ? `<iframe class="preview" src="${mod.route}" loading="lazy" title="Preview of ${mod.title}" tabindex="-1" scrolling="no"></iframe>`
+            : `<div class="placeholder-preview"><canvas data-placeholder="${index}"></canvas><span>Connect route</span></div>`
+          }
+        </div>
+
+        <div class="game-info">
+          <div class="game-row">
+            <div>
+              <h3 class="game-title">${mod.title}</h3>
+            </div>
+            <span class="game-index">${String(index + 1).padStart(2, "0")}</span>
+          </div>
+
+          <div class="game-row">
+            <p class="game-desc">${mod.description}</p>
+            <span class="status-dot" aria-hidden="true"></span>
+          </div>
+
+          <div class="tags">${tagsHTML}</div>
+        </div>
+      `;
+
+      card.addEventListener("click", () => openModule(mod.route));
+      card.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openModule(mod.route);
+        }
+      });
+
+      return card;
+    }
+
+    function openModule(route) {
+      if (!route) return;
+
+      const features = [
+        "popup=yes",
+        "noopener=yes",
+        "noreferrer=yes",
+        `width=${screen.availWidth}`,
+        `height=${screen.availHeight}`,
+        "left=0",
+        "top=0"
+      ].join(",");
+
+      const targetUrl = `${route}${route.includes("?") ? "&" : "?"}hubFullscreen=1`;
+      const newWindow = window.open(targetUrl, "_blank", features);
+
+      if (newWindow) {
+        try {
+          newWindow.moveTo(0, 0);
+          newWindow.resizeTo(screen.availWidth, screen.availHeight);
+        } catch (e) {}
+      }
+    }
+
+    function render() {
+      const fragment = document.createDocumentFragment();
+      MODULES.forEach((mod, i) => fragment.appendChild(createCard(mod, i)));
+      grid.appendChild(fragment);
+      requestAnimationFrame(drawPlaceholders);
+    }
+
+    function drawPlaceholders() {
+      document.querySelectorAll("canvas[data-placeholder]").forEach(canvas => {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        const w = rect.width;
+        const h = rect.height;
+        const idx = Number(canvas.dataset.placeholder);
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 1;
+        const step = 22 + idx * 2;
+        for (let x = -w; x < w * 2; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x + w * 0.45, h);
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = "rgba(255,255,255,0.38)";
+        ctx.strokeRect(w * 0.18, h * 0.2, w * 0.64, h * 0.58);
+
+        ctx.beginPath();
+        ctx.arc(w * 0.5, h * 0.49, Math.min(w, h) * 0.13, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(255,255,255,0.86)";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(`MOD_${String(idx + 1).padStart(2, "0")}`, w / 2, h * 0.72);
+      });
+    }
+
+    window.addEventListener("resize", () => {
+      clearTimeout(window.__placeholderResize);
+      window.__placeholderResize = setTimeout(drawPlaceholders, 120);
+    });
+
+    createFilters();
+    render();
+    updateCount();
+  </script>
+</body>
+</html>
