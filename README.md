@@ -4,7 +4,7 @@ A Micro Arcade Laboratory — minigames, prototypes, and interactive surfaces ex
 
 ## Live Site
 
-**[blackars.github.io/PlayableInterfacesLaboratory](https://blackars.github.io/PlayableInterfacesLaboratory/)**
+**[blackars.github.io/PlayableInterfacesLaboratory](https://blackars.github.io/PlayableInterfaceLaboratory/)**
 
 ## What Is This
 
