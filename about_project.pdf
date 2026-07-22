@@ -1,0 +1,176 @@
+Cambiar imagen de certificado microsoft/linkedin por la que tiene logo microsoft
+El hub agregarle una barra debusqueda con boton y animacion que indique que desplegara la barra
+A las UI que son de transformacion de imagenes con ASCII art agregarles que usen una imagen predetermina antes de que el usuario cargue una para que se sepa de que trata la experiencia
+Probar el titulo como Play UI Lab
+Documento de lineamientos esteticos y de diseño, el color, la forma, la fuente, la distribucion, la tematica y demas todo eso hablado en filosofia
+Ajustar el texto donde se menciona micro arcade lab
+Darle al sitio traduccion en español e ingles
+Arriba de micro arcade lab text poner un webp de geolines en movimiento
+El ejercicio de scroll en micro arcade lab deebe funcionas
+In playable interface lab agregar a cada tag de topicos o palabra clave
+In playable... agregar un filtro de busqueda
+In playable, add a placeholder webm for each no autoplayable experience
+
+
+## 1) Estado del repositorio (análisis ejecutivo)
+
+Con la información disponible del repositorio `blackars/ui-drills`, se observa:
+
+-   Proyecto centrado en experiencias UI/visuales y minijuegos (HTML/CSS/JS).
+-   Estructura principal con archivos como:
+    -   `hub.html`
+    -   `maincv.html`
+    -   `asciiarteffect.html`
+    -   `spiral1.html`
+    -   `spiral2.html`
+    -   `truecircletypography.html`
+    -   carpetas temáticas (scroll, parallax, minijuegos, clip-path, etc.) github.com
+-   Sin README accesible por la ruta `main/README.md` (devolvió 404), por lo que falta documentación base formal raw.githubusercontent.com.
+-   Lenguajes predominantes: HTML, CSS y JavaScript (fuerte orientación frontend) github.com.
+
+> Nota importante: **No puedo “agregar archivos” directamente a tu repositorio desde aquí**, pero sí te dejo la estructura exacta recomendada para incorporarlos.
+
+----------
+
+## 2) Los 12 archivos del screenshot (pendientes de integrar)
+
+Según tu captura, los 12 archivos son:
+
+1.  `ASCIIGlitchMirror.html`
+2.  `DarkSnake.html`
+3.  `GavityDots.html` _(posible typo: GravityDots)_
+4.  `magnetic-cursor-field.html`
+5.  `MirrorSplit.html`
+6.  `MonolithDefense.html`
+7.  `OrbitLock.html`
+8.  `PacmanDarks.html`
+9.  `PrismRunner.html`
+10.  `ScrollTunnel-InfiniteDepth.html`
+11.  `Tri-Line.html`
+12.  `TypographyBoss.html`
+
+----------
+
+## 3) Tabla maestra de 21 experiencias (propuesta consolidada)
+
+Como no tengo el árbol completo por archivo para inspección técnica detallada, esta tabla combina:
+
+-   Experiencias **confirmadas por nombre** del repo + screenshot,
+-  y una clasificación técnica **propuesta** para que tú/tu equipo la validen al integrar.
+
+4) Tabla 2 — Cómo implementarlas dentro del Hub
+
+tabla 1 y 2 de los anteriors puntos en el archivo Tabla_1_y_2.pdf
+
+
+las 12 experiencias mas recientes fueron generadas partiendo de estas descripciones, primero 5 y luego las otras 7: 
+
+1. Magnetic Cursor Field
+Tipo: efecto interactivo / interfaz experimental
+Inspirado en: parallax gradient, CSS Clip-path effect, Sticky Geometry Scroll Tex
+Una superficie de texto o cards donde el cursor actúa como un campo magnético. Los elementos se deforman, se separan o se alinean según la distancia al mouse/touch.
+Mecánicas visuales:
+Letras que se repelen del cursor.
+Grid de puntos que se curva.
+Cards que se inclinan con profundidad.
+Modo “attractor/repulsor” con click.
+Por qué encaja: mantiene el estilo minimalista y experimental del repo, pero añade una interfaz más táctil y reactiva.
+Stack sugerido:
+HTML + CSS variables + JS vanilla con requestAnimationFrame.
+2. Scroll Tunnel / Infinite Depth
+Tipo: efecto de scroll / scrollytelling visual
+Inspirado en: Efecto de Zoom al Scroll, scrollytelling, spiral1.html, spiral2.html
+Una experiencia donde al hacer scroll el usuario “viaja” por un túnel de formas geométricas, texto circular, gradientes o frames tipográficos.
+Mecánicas visuales:
+Capas que escalan hacia la cámara.
+Texto que aparece como señalización dentro del túnel.
+Deformaciones tipo espiral.
+Cambio de color por secciones.
+Por qué encaja: ya tienes experimentos de zoom, scroll narrativo y espirales; esto los combina en una pieza más inmersiva api.github.com.
+Extra: puede tener un modo minijuego: “evita obstáculos con scroll” o “mantén el centro alineado”.
+3. ASCII Camera / Glitch Mirror
+Tipo: efecto generativo / juguete visual
+Inspirado en: asciiarteffect.html, technovisualizer.html
+Una interfaz que convierte la webcam, una imagen cargada o el movimiento del mouse en arte ASCII animado con glitches.
+Mecánicas visuales:
+Cámara convertida a caracteres.
+Slider de densidad ASCII.
+Modo verde terminal, blanco/negro o neón.
+Glitches aleatorios por sonido, click o movimiento.
+Exportar frame como PNG/texto.
+Por qué encaja: prolonga directamente la línea de ASCII art y visualizadores del repo api.github.com.
+Versión simple: si no quieres usar webcam, puedes generar el ASCII desde formas, ruido Perlin o una imagen fija.
+4. Microgame: Gravity Dots
+Tipo: minijuego minimalista
+Inspirado en: subatomiccollider, wavehunter, darkpong
+Un minijuego donde controlas un punto que altera la gravedad de partículas. El objetivo es agrupar, esquivar o colisionar partículas sin tocar zonas peligrosas.
+Mecánica:
+El jugador mueve un “núcleo”.
+Las partículas orbitan alrededor.
+Hay que capturar partículas claras y evitar partículas oscuras.
+Combos por mantener órbitas estables.
+Duración ideal: 45–60 segundos.
+Por qué encaja: conecta con la estética de partículas/subatómica ya presente en subatomiccollider y con el tono arcade oscuro de los minijuegos api.github.com.
+Controles:
+Mouse/touch para mover el núcleo.
+Click/tap para invertir gravedad.
+5. Kinetic Typography Boss Fight
+Tipo: interfaz experimental + minijuego tipográfico
+Inspirado en: truecircletypography.html, Sticky Geometry Scroll Tex, darkinvaders
+Un “boss fight” donde el enemigo es una palabra gigante o frase circular. El jugador debe esquivar letras, romper sílabas o escribir comandos para destruir patrones tipográficos.
+Mecánicas:
+Letras orbitando en círculos.
+Palabras que se fragmentan en proyectiles.
+El jugador dispara con clicks o teclas.
+Cada nivel usa una composición tipográfica distinta.
+Bosses: “NOISE”, “VOID”, “SCROLL”, “INPUT”, etc.
+Por qué encaja: mezcla la línea tipográfica del repo con los minijuegos arcade ya existentes api.github.com.
+Estética: fondo negro, tipografía condensada, líneas finas, partículas mínimas.
+Recomendación de prioridad
+Si quieres agregar rápido piezas potentes a la galería, yo las haría en este orden:
+Magnetic Cursor Field — rápido, visual, reusable como landing interactiva.
+Scroll Tunnel / Infinite Depth — conecta muy bien con los ejercicios de scroll.
+Gravity Dots — minijuego simple pero adictivo.
+ASCII Camera / Glitch Mirror — más llamativo, pero con algo más de complejidad.
+Kinetic Typography Boss Fight — el más ambicioso y probablemente el más distintivo.
+Mi recomendación: empieza por Magnetic Cursor Field como nuevo ejercicio standalone en un solo html, y luego lo integras al hub.html como una card más.
+
+1) Tri-Line // 3 en línea (ultraminimal)
+Grid 3x3 sobre fondo negro.
+Fichas: círculo hueco y cuadrado sólido (B/N).
+Animación elegante al colocar ficha (scale + fade + micro glow).
+Línea ganadora aparece como trazo fino animado.
+UI limpia: marcador, turno, reset.
+Twist original: modo “best of 5” con transición entre rondas tipo galería.
+2) Pacman Refractor
+Laberinto minimal que se reconfigura cada 30s con transición suave (muros se desplazan/rotan).
+Fantasmas reemplazados por triángulos giratorios (cada uno con patrón de persecución distinto).
+Jugador come nodos de energía (no pellets clásicos con puntos, sino cápsulas limpias).
+Twist: cuando cambia el mapa, se abre una “ventana de fase” de 2s donde atraviesas un muro.
+3) Cube Snake
+Snake clásico pero cuerpo formado por cubitos 3D flat (sin textura, solo luz/sombra).
+Movimiento con interpolation suave (no salto brusco de celda visualmente).
+Comida = cubo brillante monocromo.
+Choque produce desintegración cúbica elegante.
+Twist: modo “Fold Grid”: el tablero rota 90° cada cierto tiempo y cambia la dirección relativa.
+4) Prism Runner
+Endless runner abstracto en carril único.
+Obstáculos = prismas/planos que aparecen con ritmo musical.
+Control minimal: izquierda/derecha + dash corto.
+Todo en B/N con grises y acentos de brillo.
+Twist: cámara no se mueve, el mundo “fluye” hacia ti con parallax geométrico.
+5) Orbit Lock
+Minijuego de timing: un anillo rota y debes alinear 2-3 segmentos para “bloquear órbitas”.
+Cada acierto agrega complejidad (más anillos, distinta velocidad).
+Interface tipo instrumento de precisión.
+Twist: físicas de inercia; los anillos no frenan instantáneo, hay peso.
+6) Mirror Split
+Puzzle espacial minimal: mueves una pieza y su clon espejo se mueve inverso.
+Objetivo: llevar ambas piezas a zonas meta simultáneas.
+Diseño limpio, formas sólidas y sombras suaves.
+Twist: espejos dinámicos (el eje de simetría se desplaza durante el nivel).
+7) Monolith Defense
+Defensa minimal: un monolito central y ondas enemigas abstractas.
+Tú controlas un escudo orbital (arco circular que gira).
+Bloqueo perfecto genera “pulse shockwave” visual elegante.
+Twist: en vez de torres, solo gestionas ángulo, timing y energía.
